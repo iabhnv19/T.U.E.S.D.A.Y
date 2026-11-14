@@ -1,0 +1,28 @@
+# Environment & Secrets
+.env
+credentials.json
+*token*.json
+
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Assistant runtime persistence
+memory/
+saved_links.txt
+screenshot*.png
+*.mp3
+*.wav
+
+# IDEs & OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+Desktop.ini
+
+# Legacy models
+vosk-model*/
