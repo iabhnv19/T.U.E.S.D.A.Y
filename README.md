@@ -458,10 +458,6 @@ These integrations are optional and require their corresponding configuration an
 
 Contributions, bug reports, and feature requests are welcome. Please keep changes focused, avoid committing credentials or generated runtime data, and include tests for changes to core behavior.
 
-## License
-
-The existing project README identifies the project as MIT-licensed. Ensure that the repository contains the corresponding `LICENSE` file before publishing or relying on that license statement.
-
 ## Developer
 
 <div align="center">
