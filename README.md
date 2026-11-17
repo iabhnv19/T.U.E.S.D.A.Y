@@ -11,7 +11,8 @@ A voice-activated AI desktop assistant for Windows, combining natural Hinglish c
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white)
 ![Language](https://img.shields.io/badge/language-Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Interface](https://img.shields.io/badge/interface-PyQt5-41CD52?style=for-the-badge&logo=qt&logoColor=white)
-![AI](https://img.shields.io/badge/AI-Groq%20API-F55036?style=for-the-badge)
+![Voice](https://img.shields.io/badge/Voice-Edge--TTS%20Neural-00B4D8?style=for-the-badge)
+![AI](https://img.shields.io/badge/AI-Universal%20LLM%20(Groq%2FOpenAI%2FLocal)-F55036?style=for-the-badge)
 ![Architecture](https://img.shields.io/badge/architecture-Tool--Calling%20Agent-6C5CE7?style=for-the-badge)
 
 </div>
@@ -22,7 +23,7 @@ A voice-activated AI desktop assistant for Windows, combining natural Hinglish c
 
 A desktop assistant should do more than answer questions. It should understand a request, interact with the operating system, work with files and applications, remember useful context, and get out of the way when it is not needed.
 
-T.U.E.S.D.A.Y is a lightweight, voice-first Windows assistant built around that idea. It combines a fast local command parser for common actions with a Groq-powered AI agent for requests that need reasoning or multiple tools. Its interface is a floating Dynamic Island-style overlay, while its speech layer supports English, Hindi, and conversational Hinglish.
+T.U.E.S.D.A.Y is a lightweight, voice-first Windows assistant built around that idea. It combines a fast local command parser for common actions with a Universal LLM AI agent (supporting Groq, OpenAI, OpenRouter, DeepSeek, and local Ollama/LM Studio models) for requests that need reasoning or multiple tools. Its interface is a floating Dynamic Island-style overlay, while its speech layer delivers **Real-Time Streaming Neural Speech** via Microsoft Edge-TTS with Indian English and Hindi support.
 
 The interaction loop is designed to stay simple:
 
@@ -31,7 +32,7 @@ Press Right Shift + Enter
         -> Speak naturally
         -> Parse a direct command or ask the AI agent
         -> Execute approved tools
-        -> Hear the response
+        -> Hear the response stream instantly (~0.3s)
         -> Interrupt speech whenever needed
 ```
 
@@ -41,11 +42,11 @@ Common commands are handled locally without an LLM round trip. More complex requ
 
 | Capability | Description |
 |---|---|
-| Voice interaction | Continuous speech input with English and Hindi recognition |
+| Voice interaction | Continuous speech input with real-time streaming neural speech (~0.3s start) |
 | Local command routing | Regex-based command parser with fuzzy application matching |
-| AI agent | Groq-powered conversations with multi-step function calling and model fallback |
+| Universal AI agent | Multi-provider LLM support (Groq, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio) |
 | Windows automation | Application control, window management, volume, media, and desktop actions |
-| Screen understanding | Active-window inspection, OCR, screen analysis, and UI automation |
+| Screen understanding | Dual-engine Python OCR (winocr + RapidOCR), on-screen text search and clicking |
 | File operations | Search, read, create, move, rename, compress, and undo supported file actions |
 | Browser automation | Chromium navigation and interaction through Playwright |
 | Persistent memory | SQLite-backed facts, conversation turns, reminders, todos, and notes |
@@ -61,9 +62,10 @@ Common commands are handled locally without an LLM round trip. More complex requ
 - Activate the assistant globally with `Right Shift + Enter`.
 - Continuous listening supports multi-turn interaction until the configured silence period is reached.
 - Speech recognition is configured for Indian English (`en-IN`) and Hindi (`hi-IN`).
-- Responses use gTTS with language routing for English/Hinglish and Hindi.
-- A local `pyttsx3` voice is available as an offline fallback.
-- Barge-in listening allows speech playback to be interrupted with phrases such as `Tuesday stop`, `Tuesday chup`, `Tuesday ruko`, or `Tuesday sun`.
+- **Real-Time Streaming Neural TTS**: Responses stream sentence-by-sentence via Microsoft Edge-TTS (`en-IN-NeerjaNeural`, `hi-IN-SwaraNeural`), dropping time-to-first-word to ~0.3s.
+- Automatic online fallback to `gTTS` and offline fallback to local Windows `pyttsx3`.
+- **Strict No-Emoji & Tight Cadence**: Spoken replies filter out all emojis and compress ellipses to eliminate awkward audio pauses.
+- Barge-in listening allows speech playback to be interrupted instantly with phrases such as `Tuesday stop`, `Tuesday chup`, `Tuesday ruko`, or `Tuesday sun`.
 
 ### Local command parser and AI agent
 
@@ -89,12 +91,12 @@ Common commands are handled locally without an LLM round trip. More complex requ
 
 ### Screen understanding and UI automation
 
-- Inspect the active window and its process information.
-- Analyze the current screen through the configured vision/OCR path.
-- Extract visible text using local OCR.
+- Inspect the active window, PID, and process information.
+- **Dual-Engine Python OCR**: Local text recognition powered by hardware-accelerated `winocr` (Windows Media OCR) and deep learning `rapidocr-onnxruntime`.
+- **Visual On-Screen Text Search & Click**: Find the exact (X, Y) pixel coordinates of any visible button, tab, link, or label and click it directly via PyAutoGUI.
+- **Spatial UI Layout Analysis**: Capture the desktop, map on-screen UI text elements with coordinates, and feed the live visual state to the LLM agent to reason and act.
 - Read selected text while preserving the existing clipboard contents.
 - Enumerate accessible window controls with `pywinauto`.
-- Find and interact with supported UI controls by their visible labels.
 - Apply safety checks to potentially destructive or sensitive UI actions.
 
 ### Files, documents, and knowledge retrieval
@@ -200,6 +202,12 @@ The following settings are documented by the project:
 | Variable | Default | Description |
 |---|---|---|
 | `GROQ_API_KEY` | Not set | API key used for Groq-powered AI conversations |
+| `LLM_PROVIDER` | `groq` | Active AI provider (`groq`, `openai`, `openrouter`, `deepseek`, `ollama`, `lmstudio`) |
+| `LLM_API_KEY` | Not set | Universal API key for the selected AI provider |
+| `LLM_MODEL` | Provider default | Default model (e.g. `openai/gpt-oss-120b`, `gpt-4o-mini`, `llama3.2`) |
+| `TTS_ENGINE` | `edge-tts` | Primary voice engine (`edge-tts`, `gtts`, `pyttsx3`, `auto`) |
+| `EDGE_VOICE_EN` | `en-IN-NeerjaNeural` | Microsoft Neural voice for English / Hinglish speech |
+| `EDGE_VOICE_HI` | `hi-IN-SwaraNeural` | Microsoft Neural voice for Hindi speech |
 | `ASSISTANT_NAME` | `T.U.E.S.D.A.Y` | Assistant display name |
 | `HOTKEY_MODIFIER` | `right shift` | Modifier used by the global activation shortcut |
 | `HOTKEY_KEY` | `enter` | Key used with the modifier to activate listening |
@@ -221,6 +229,10 @@ The assistant supports a broad command set. These examples cover frequently used
 | Diagnostics | "Clean RAM" | Runs the supported memory-cleanup operation |
 | Network | "What's my IP" / "Check ping" | Reports network information and latency |
 | Desktop | "Clean my desktop" | Organizes loose desktop files |
+| Screen | "What's on my screen" / "Analyze screen" | Maps spatial screen layout via OCR and explains/reasons |
+| Screen | "Find text Submit on screen" | Locates visual element coordinates via local OCR |
+| Screen | "Click text Save on screen" | Clicks element center using OCR-guided coordinates |
+| Screen | "Read screen text" | Extracts on-screen text with layout preservation |
 | Screen | "Take a screenshot" | Captures the desktop |
 | Screen | "Start screen recording" | Starts Windows Game Bar recording |
 | Windows | "Snap left" / "Snap right" | Snaps the active window |

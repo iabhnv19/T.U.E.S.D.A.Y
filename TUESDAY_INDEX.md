@@ -8,9 +8,9 @@
 ## 1. Project High-Level Overview
 - **Name**: T.U.E.S.D.A.Y (Tactical Unified Electronic Systematic Digital Assistant)
 - **Role**: Lightweight, proactive, Windows desktop voice assistant inspired by Friday/JARVIS.
-- **Persona**: Female voice, sharp, witty, warm, conversational Hinglish (Hindi + English) speaker.
+- **Persona**: Female voice, sharp, witty, warm, conversational Hinglish (Hindi + English) speaker. Strict no-emoji rule and tight natural punctuation cadence.
 - **User Gender**: Male (`karoge`, `tum sunao`, `bhai`, `dost`).
-- **Core Loop**: Global Hotkey (`Right Shift + Enter`) → Continuous Active Listening until 5s silence → Local Regex Command Parser (Zero API Latency) → Fallback to Groq LLM with tool-calling agent loop → Natural Female Voice (gTTS) with real-time Barge-In speech cancellation → Floating OLED Dynamic Island Overlay UI.
+- **Core Loop**: Global Hotkey (`Right Shift + Enter`) → Continuous Active Listening until 5s silence → Local Regex Command Parser (Zero API Latency) → Universal LLM Brain with tool-calling agent loop (Groq, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio) → Real-Time Streaming Neural Voice (Edge-TTS `en-IN-NeerjaNeural` / `hi-IN-SwaraNeural`) with instant mid-generation playback (~0.3s start) and real-time Barge-In cancellation → Floating OLED Dynamic Island Overlay UI.
 
 ---
 
@@ -29,15 +29,16 @@ E:\T.U.E.S.D.A.Y\
 │
 ├── core/
 │   ├── config.py            # Central settings, environment loader, and core SYSTEM_PROMPT
-│   ├── brain.py             # Agentic AI Brain: multi-hop tool loop, fallback chain, memory integration
+│   ├── brain.py             # Agentic AI Brain: multi-hop tool loop, fallback chain, SentenceChunker, memory integration
+│   ├── llm.py               # Universal LLM Client: Groq, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio + token streaming
 │   ├── memory.py            # MemoryStore: SQLite facts/turns/reminders/todos/notes + ChromaDB
 │   ├── scheduler.py         # BackgroundScheduler thread checking due reminders & triggering alerts
-│   ├── tools.py             # Decorator-based @tool registry, OpenAI schemas, safety gate & undo journal
-│   └── voice.py             # Bilingual SpeechRecognition (en-IN/hi-IN) & gTTS audio playback
+│   ├── tools.py             # Decorator-based @tool registry, schema auto-normalizer, safety gate & undo journal
+│   └── voice.py             # Bilingual STT & Real-Time Streaming Neural TTS (Edge-TTS, gTTS, pyttsx3)
 │
 ├── modules/
 │   ├── registered_tools.py  # 40+ native tools wrapping PC, web search, utilities, and diagnostics
-│   ├── screen_tools.py      # Phase 4: Screen analysis, active window, OCR, and pywinauto UI automation
+│   ├── screen_tools.py      # Phase 4: Screen analysis, active window, dual-engine OCR (winocr + RapidOCR), UI click actions
 │   ├── file_tools.py        # Phase 5: Fast file search, PDF/DOCX readers, RAG indexing & file manipulation
 │   ├── browser_tools.py     # Phase 6: Playwright browser navigation, interaction, and search
 │   ├── productivity_tools.py# Phase 7: Reminders, todos, notes, routines, daily briefing, Google OAuth
@@ -191,7 +192,7 @@ E:\T.U.E.S.D.A.Y\
 ### H. Screen Understanding & UI Automation (Phase 4)
 | Voice Trigger | Tool Called | Description |
 |---|---|---|
-| *"What's on my screen"*, *"Analyze screen"* | `analyze_screen` | Captures screen, downscales to 1024px, and analyzes visual state via Groq Vision API or local OCR. |
+| *"What's on my screen"*, *"Analyze screen"* | `analyze_screen` | Captures screen, runs local dual-engine Python OCR to map all text & coordinates + active window info, and prompts LLM to reason and recommend actions. |
 | *"Active window"*, *"Focused window"* | `get_active_window` | Retrieves foreground window title, process name, and PID via Win32. |
 | *"Read this text"*, *"Selected text"* | `get_selected_text` | Preserves clipboard, sends `Ctrl+C`, reads selected text, and restores user's original clipboard. |
 | *"Read screen"*, *"Screen text"* | `read_screen_text` | Performs local dual-engine OCR using `winocr` (Windows Media OCR) and `rapidocr_onnxruntime`. |
@@ -285,16 +286,20 @@ def open_app(app_name: str) -> str:
 
 ---
 
-## 6. Groq Model Fallback Chain & Rate Limit Guard
+## 6. Universal LLM Providers & Fallback Chain
 
-The assistant queries Groq's API on startup to discover all available chat models and sorts them into a priority fallback chain:
-1. `qwen/qwen3.8-27b` (Primary default)
-2. `openai/gpt-oss-120b` (First fallback)
-3. `openai/gpt-oss-20b` (Second fallback)
+The assistant connects to any AI provider via `core/llm.py` (`UniversalLLMClient`):
+- **Groq** (Primary ultra-fast default: `openai/gpt-oss-120b`, fallback to `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`)
+- **OpenAI** (`gpt-4o-mini`, `gpt-4o`, `gpt-3.5-turbo`)
+- **OpenRouter** (Claude, Gemini, Llama, DeepSeek via unified gateway)
+- **DeepSeek** (`deepseek-chat`, `deepseek-reasoner`)
+- **Ollama / LM Studio** (Local offline models: `llama3.2`, `qwen2.5`, `mistral`)
 
 ### Key Guardrails:
-- `max_tokens = 500`: Strictly enforces concise responses and prevents exceeding free-tier tokens-per-minute (TPM) limits.
-- `RateLimitError` & `429` Handling: Automatically advances `current_model_index` and retries on the next model seamlessly.
+- `max_tokens = 500`: Strictly enforces concise responses and prevents exceeding free-tier limits.
+- `RateLimitError` & `429` Handling: Automatically advances `current_model_index` and retries on the next fallback model.
+- **Strict No-Emoji Rule**: All LLM replies strictly filter out emojis, symbols, and pictographs.
+- **Tight Punctuation Cadence**: Ellipses (`...`) are compressed to eliminate unnatural pauses during audio synthesis.
 - **Clean Dialogue Storage**: Raw web search dumps are injected only into the single turn's prompt payload and are **never saved into persistent history**. This keeps request tokens tiny (~150 tokens) and generation latencies at **~0.21s**.
 
 ---
@@ -318,14 +323,22 @@ The assistant queries Groq's API on startup to discover all available chat model
 
 ## 8. Speech & Audio Engine Details
 
-- **TTS Engine**: `gTTS` with automatic language routing:
-  - English/Hinglish: `lang="en"`, `tld="co.in"`
-  - Pure Hindi: `lang="hi"`
-  - Playback via `pygame.mixer` at **27,500 Hz frequency** (~1.15x natural speech pacing).
+- **TTS Engine**: Real-Time Streaming Neural Speech via `edge-tts`:
+  - English/Hinglish: `en-IN-NeerjaNeural` (natural, expressive, crisp Indian female voice)
+  - Pure Hindi: `hi-IN-SwaraNeural`
+  - Pacing: Accelerated with `rate="+12%"` for tight, snappy dialogue without punctuation gaps.
+  - Playback via `pygame.mixer` at **27,500 Hz frequency**.
+  - Online Fallback: `gTTS` (`en-IN` / `hi`).
   - Offline Fallback: `pyttsx3` with local Windows female voice (Zira/Hazel).
+- **Real-Time Streaming TTS (Mid-Generation Speech)**:
+  - `SentenceChunker` chunks LLM tokens on natural sentence boundaries (`. `, `! `, `? `, `\n`).
+  - As soon as the first sentence is formed (~200ms), it is enqueued into `speak_stream_chunk()`.
+  - While Sentence 1 is playing out loud, Sentence 2 is pre-synthesized in the background for gapless speech.
+  - Perceived time-to-first-word drops from ~3.0s down to **~0.3s**!
 - **Speech Interruption (Barge-In)**:
   - Background listener thread runs during speech playback with energy threshold 450.
   - Targeted triggers: `"tuesday stop"`, `"tuesday chup"`, `"tuesday ruko"`, `"tuesday sun"`. Ambient room noise will not cut off speech.
+  - On interruption, `voice.stop_speaking()` halts audio immediately and clears the speech queue.
 
 ---
 
