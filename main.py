@@ -165,16 +165,25 @@ class Tuesday:
                 if direct_result:
                     response = direct_result
                     print(f"  {Config.NAME} [local]: {response}")
+                    interrupted_text = self._speak_with_bargein(response)
                 else:
-                    # Pass through to Groq agentic brain
+                    # Pass through to Groq agentic brain with Real-Time Streaming TTS
+                    self.voice.start_speech_stream()
+
+                    def _on_chunk(sentence_chunk: str):
+                        self.overlay.update_status("speaking", sentence_chunk)
+                        self.voice.speak_stream_chunk(sentence_chunk)
+
                     response = self.brain.think(
                         user_input,
                         on_status=lambda s: self.overlay.update_status("thinking", s),
+                        on_sentence=_on_chunk,
                     )
                     print(f"  {Config.NAME}: {response}")
+                    self.voice.finish_speech_stream(wait=False)
 
-                # Speak response with real-time barge-in listener
-                interrupted_text = self._speak_with_bargein(response)
+                    # Monitor for real-time barge-in while streaming sentences finish playing
+                    interrupted_text = self._wait_for_speech_with_bargein()
 
                 if interrupted_text:
                     print(f"  You (Interrupted): {interrupted_text}")
@@ -191,6 +200,47 @@ class Tuesday:
             time.sleep(0.5)
             self.overlay.hide_bar()
             print(f"  [{Config.NAME}] 💤 Sleep mode. Press Right Shift + Enter to wake.")
+
+    def _wait_for_speech_with_bargein(self):
+        """Monitors mic while streaming sentences finish playing out loud."""
+        import speech_recognition as sr
+        try:
+            with sr.Microphone() as source:
+                while self.voice.is_speaking:
+                    try:
+                        self.voice.recognizer.energy_threshold = 450
+                        audio = self.voice.recognizer.listen(source, timeout=0.4, phrase_time_limit=4.0)
+
+                        heard = self.voice.recognizer.recognize_google(
+                            audio, language=Config.VOICE_LANGUAGE
+                        ).strip().lower()
+
+                        is_targeted_stop = any(k in heard for k in [
+                            "tuesday stop", "tuesday chup", "tuesday ruko", "tuesday sun",
+                            "tuesday meri baat", "stop tuesday", "chup ho jao"
+                        ])
+                        is_new_tuesday_query = heard.startswith("tuesday") or "tuesday " in heard
+                        is_urgent_stop = heard in ["stop", "ruko", "chup", "shant"]
+
+                        if is_targeted_stop or is_new_tuesday_query or is_urgent_stop:
+                            print(f"\n  [{Config.NAME}] 🛑 Intentional interruption detected: '{heard}'")
+                            self.voice.stop_speaking()
+
+                            if (is_targeted_stop or is_urgent_stop) and len(heard.split()) <= 2:
+                                return "Standing by."
+
+                            clean_query = heard.replace("tuesday", "").strip()
+                            return clean_query or heard
+                    except (sr.WaitTimeoutError, sr.UnknownValueError):
+                        continue
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        finally:
+            self.voice.recognizer.energy_threshold = 300
+
+        return None
 
     def _speak_with_bargein(self, response: str):
         """Speaks in a background thread while monitoring mic for intentional interruption."""

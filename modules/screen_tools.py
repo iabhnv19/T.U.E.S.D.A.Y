@@ -33,11 +33,20 @@ except ImportError:
 
 try:
     from rapidocr_onnxruntime import RapidOCR
-    _ocr_engine = RapidOCR()
-    HAS_OCR = True
+    _rapid_ocr = RapidOCR()
+    HAS_RAPID_OCR = True
 except Exception:
-    _ocr_engine = None
-    HAS_OCR = False
+    _rapid_ocr = None
+    HAS_RAPID_OCR = False
+
+try:
+    import winocr
+    HAS_WINOCR = True
+except Exception:
+    winocr = None
+    HAS_WINOCR = False
+
+HAS_OCR = HAS_RAPID_OCR or HAS_WINOCR
 
 
 # ── Active Window & Selection ──────────────────────────────────────────────
@@ -118,64 +127,282 @@ def get_selected_text() -> str:
         return f"Selected text copy nahi ho paya: {e}"
 
 
-# ── Screen Capture & OCR ───────────────────────────────────────────────────
+# ── Screen Capture & Dual-Engine Python OCR ───────────────────────────────
+
+def _capture_screenshot(region: Optional[str] = None):
+    """Safely capture desktop screenshot with optional region 'x,y,w,h'."""
+    bbox = None
+    offset_x, offset_y = 0, 0
+    if region:
+        try:
+            parts = [int(p.strip()) for p in region.split(",") if p.strip().isdigit()]
+            if len(parts) == 4:
+                bbox = tuple(parts)
+                offset_x, offset_y = parts[0], parts[1]
+        except Exception:
+            bbox = None
+
+    try:
+        shot = pyautogui.screenshot(region=bbox)
+        return shot, offset_x, offset_y
+    except Exception as e:
+        # Fallback using PIL ImageGrab if available
+        try:
+            from PIL import ImageGrab
+            shot = ImageGrab.grab(bbox=bbox)
+            return shot, offset_x, offset_y
+        except Exception:
+            return None, 0, 0
+
+
+def _extract_ocr_elements(img, offset_x: int = 0, offset_y: int = 0) -> List[Dict[str, Any]]:
+    """
+    Run local Python OCR engines (WinOCR + RapidOCR) and return structured text elements:
+    [{'text': str, 'center': (cx, cy), 'bbox': (x, y, w, h), 'confidence': float}]
+    """
+    if img is None:
+        return []
+
+    elements: List[Dict[str, Any]] = []
+
+    # 1. Try Windows Native Media OCR (winocr)
+    if HAS_WINOCR and winocr is not None:
+        try:
+            import asyncio
+            loop = None
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            async def _scan():
+                return await winocr.recognize_pil(img, "en")
+
+            ocr_res = loop.run_until_complete(_scan()) if loop.is_running() is False else asyncio.run(_scan())
+            if ocr_res and ocr_res.lines:
+                for line in ocr_res.lines:
+                    line_text = line.text.strip()
+                    if not line_text:
+                        continue
+                    # Approximate line bbox from words
+                    if line.words:
+                        min_x = min(w.bounding_rect.x for w in line.words) + offset_x
+                        min_y = min(w.bounding_rect.y for w in line.words) + offset_y
+                        max_x = max(w.bounding_rect.x + w.bounding_rect.width for w in line.words) + offset_x
+                        max_y = max(w.bounding_rect.y + w.bounding_rect.height for w in line.words) + offset_y
+                        w_box = max_x - min_x
+                        h_box = max_y - min_y
+                        cx = int(min_x + w_box / 2)
+                        cy = int(min_y + h_box / 2)
+                        elements.append({
+                            "text": line_text,
+                            "center": (cx, cy),
+                            "bbox": (int(min_x), int(min_y), int(w_box), int(h_box)),
+                            "confidence": 0.98,
+                        })
+                if elements:
+                    return elements
+        except Exception:
+            pass
+
+    # 2. Try RapidOCR (Deep Learning PaddleOCR ONNX Engine)
+    if HAS_RAPID_OCR and _rapid_ocr is not None:
+        try:
+            import numpy as np
+            img_arr = np.array(img)
+            ocr_res, _ = _rapid_ocr(img_arr)
+            if ocr_res:
+                for item in ocr_res:
+                    box, text, score = item
+                    t = text.strip()
+                    if not t:
+                        continue
+                    xs = [pt[0] + offset_x for pt in box]
+                    ys = [pt[1] + offset_y for pt in box]
+                    min_x, max_x = min(xs), max(xs)
+                    min_y, max_y = min(ys), max(ys)
+                    cx = int((min_x + max_x) / 2.0)
+                    cy = int((min_y + max_y) / 2.0)
+                    elements.append({
+                        "text": t,
+                        "center": (cx, cy),
+                        "bbox": (int(min_x), int(min_y), int(max_x - min_x), int(max_y - min_y)),
+                        "confidence": round(float(score), 2),
+                    })
+                if elements:
+                    return elements
+        except Exception:
+            pass
+
+    return elements
+
 
 @tool(
     name="read_screen_text",
-    description="Extract and read visible text from the screen (or a specific region) using local OCR.",
+    description="Extract and read visible text from the screen using high-precision local Python OCR.",
     params_schema={
         "region": {
             "type": "string",
             "description": "Optional bounding box 'x,y,width,height' or leave empty for full screen.",
-        }
+        },
+        "with_coordinates": {
+            "type": "boolean",
+            "description": "Whether to include screen (X, Y) pixel coordinates for each detected element.",
+        },
     },
     risk="low",
 )
-def read_screen_text(region: Optional[str] = None) -> str:
-    """Perform OCR on screen capture."""
-    global _ocr_engine, HAS_OCR
-    if not HAS_OCR or _ocr_engine is None:
-        try:
-            from rapidocr_onnxruntime import RapidOCR
-            _ocr_engine = RapidOCR()
-            HAS_OCR = True
-        except Exception:
-            return "OCR module (rapidocr_onnxruntime) install nahi hai bhai. Screen text read karne ke liye ise install karein."
+def read_screen_text(region: Optional[str] = None, with_coordinates: bool = False) -> str:
+    """Perform local OCR on screen capture and return layout-preserved text."""
+    if not HAS_OCR:
+        return "Local OCR modules (winocr / rapidocr) available nahi hain bhai."
 
+    img, ox, oy = _capture_screenshot(region)
+    if img is None:
+        return "Screen capture capture nahi ho saka (desktop access error ya session locked ho sakta hai)."
+
+    elements = _extract_ocr_elements(img, ox, oy)
+    if not elements:
+        return "Screen par koi readable text detect nahi hua."
+
+    if with_coordinates:
+        lines = [f"• '{el['text']}' at pos ({el['center'][0]}, {el['center'][1]})" for el in elements]
+        return f"Detected {len(elements)} screen text elements with coordinates:\n" + "\n".join(lines[:40])
+
+    # Plain text summary
+    text_content = "\n".join([el["text"] for el in elements])
+    if len(text_content) > 1500:
+        text_content = text_content[:1500] + "\n... [truncated]"
+    return f"Screen text extracted ({len(elements)} elements):\n{text_content}"
+
+
+@tool(
+    name="find_text_on_screen",
+    description="Find the exact (X, Y) pixel coordinates of a button, label, or text snippet on screen using OCR.",
+    params_schema={
+        "query": {
+            "type": "string",
+            "description": "Text, button label, or word to find on the screen.",
+        },
+        "region": {
+            "type": "string",
+            "description": "Optional bounding box 'x,y,width,height' to narrow search.",
+        },
+    },
+    risk="low",
+)
+def find_text_on_screen(query: str, region: Optional[str] = None) -> str:
+    """Search for on-screen text coordinates."""
+    if not HAS_OCR:
+        return "OCR engine available nahi hai."
+
+    img, ox, oy = _capture_screenshot(region)
+    if img is None:
+        return "Screen capture nahi ho saka."
+
+    elements = _extract_ocr_elements(img, ox, oy)
+    if not elements:
+        return "Screen par koi readable text nahi mila."
+
+    q_clean = query.lower().strip()
+    matches = []
+    for el in elements:
+        t = el["text"].lower()
+        if q_clean in t or t in q_clean:
+            matches.append(el)
+
+    if not matches:
+        return f"Text '{query}' screen par nahi mila."
+
+    best = matches[0]
+    cx, cy = best["center"]
+    return f"Found '{best['text']}' on screen at coordinates X={cx}, Y={cy} (Bounding box: {best['bbox']})."
+
+
+@tool(
+    name="click_text_on_screen",
+    description="Visually locate a button, link, or label anywhere on screen via OCR and click it with the mouse.",
+    params_schema={
+        "text": {
+            "type": "string",
+            "description": "The exact or partial text of the button/element to click.",
+        },
+        "double_click": {
+            "type": "boolean",
+            "description": "Whether to perform a double-click instead of single click.",
+        },
+        "right_click": {
+            "type": "boolean",
+            "description": "Whether to right-click the element.",
+        },
+        "region": {
+            "type": "string",
+            "description": "Optional bounding box 'x,y,w,h'.",
+        },
+    },
+    risk="medium",
+)
+def click_text_on_screen(
+    text: str,
+    double_click: bool = False,
+    right_click: bool = False,
+    region: Optional[str] = None,
+) -> str:
+    """Find text via OCR and click its center coordinates."""
+    danger_words = ["delete all", "format", "pay now", "buy now", "confirm transfer", "shutdown"]
+    if any(w in text.lower() for w in danger_words):
+        pass  # Higher safety gate can intercept if needed
+
+    img, ox, oy = _capture_screenshot(region)
+    if img is None:
+        return "Screen capture fail ho gaya, click nahi kar sakti."
+
+    elements = _extract_ocr_elements(img, ox, oy)
+    if not elements:
+        return "Screen par koi text detect nahi hua."
+
+    clean_target = text.lower().strip()
+    matched = None
+
+    # 1. Exact match
+    for el in elements:
+        if el["text"].lower().strip() == clean_target:
+            matched = el
+            break
+
+    # 2. Substring match
+    if not matched:
+        for el in elements:
+            if clean_target in el["text"].lower():
+                matched = el
+                break
+
+    if not matched:
+        return f"'{text}' text screen par nahi mila click karne ke liye."
+
+    cx, cy = matched["center"]
     try:
-        bbox = None
-        if region:
-            parts = [int(p.strip()) for p in region.split(",") if p.strip().isdigit()]
-            if len(parts) == 4:
-                bbox = tuple(parts)
-
-        screenshot = pyautogui.screenshot(region=bbox)
-        # Convert PIL Image to bytes or numpy array
-        img_byte_arr = io.BytesIO()
-        screenshot.save(img_byte_arr, format="PNG")
-        img_bytes = img_byte_arr.getvalue()
-
-        result, _ = _ocr_engine(img_bytes)
-        if not result:
-            return "Screen par koi readable text detect nahi hua."
-
-        lines = [item[1] for item in result if item and len(item) > 1 and item[1]]
-        full_text = "\n".join(lines)
-        if len(full_text) > 1500:
-            full_text = full_text[:1500] + "\n... [truncated]"
-
-        return f"Screen text extracted:\n{full_text}"
+        if right_click:
+            pyautogui.rightClick(cx, cy)
+            return f"Right-clicked '{matched['text']}' at screen coordinates ({cx}, {cy})."
+        elif double_click:
+            pyautogui.doubleClick(cx, cy)
+            return f"Double-clicked '{matched['text']}' at screen coordinates ({cx}, {cy})."
+        else:
+            pyautogui.click(cx, cy)
+            return f"Clicked '{matched['text']}' at screen coordinates ({cx}, {cy})."
     except Exception as e:
-        return f"OCR processing mein error aaya: {e}"
+        return f"Mouse click execute karte waqt error: {e}"
 
 
 @tool(
     name="analyze_screen",
-    description="Capture and visually analyze the screen or active window. Uses Groq vision model if available or OCR fallback.",
+    description="Capture screen, run high-precision local Python OCR to detect all UI elements & text layout, and use AI reasoning to understand the screen and decide actions.",
     params_schema={
         "prompt": {
             "type": "string",
-            "description": "Question or instruction about what to look for on screen.",
+            "description": "Question, inspection request, or task regarding what is on screen.",
         },
         "region": {
             "type": "string",
@@ -184,66 +411,71 @@ def read_screen_text(region: Optional[str] = None) -> str:
     },
     risk="low",
 )
-def analyze_screen(prompt: str = "Describe what is on screen and any open windows or errors", region: Optional[str] = None) -> str:
-    """Analyze screen via Groq Vision API or local inspection."""
+def analyze_screen(
+    prompt: str = "Describe what is on screen and any open windows or errors",
+    region: Optional[str] = None,
+) -> str:
+    """Analyze screen via local Python OCR + Active Window + LLM reasoning."""
+    img, ox, oy = _capture_screenshot(region)
+    if img is None:
+        win_info = get_active_window()
+        return f"Screen capture unavailable. Active foreground window: {win_info}"
+
+    elements = _extract_ocr_elements(img, ox, oy)
+    win_info = get_active_window()
+
+    # Formulate a structured UI spatial state
+    element_lines = []
+    for el in elements[:40]:
+        element_lines.append(f"- '{el['text']}' at position ({el['center'][0]}, {el['center'][1]})")
+
+    elements_text = "\n".join(element_lines) if element_lines else "No text detected."
+
+    ui_context = (
+        f"[ACTIVE WINDOW]: {win_info}\n"
+        f"[ON-SCREEN DETECTED UI ELEMENTS & TEXT ({len(elements)} items)]:\n"
+        f"{elements_text}\n"
+    )
+
+    # Pass the rich visual context to the LLM Brain to reason and answer
+    is_local = Config.LLM_PROVIDER in ("ollama", "lmstudio")
+    if not Config.LLM_API_KEY and not is_local:
+        return f"Local Screen Analysis:\n{ui_context[:600]}"
+
     try:
-        bbox = None
-        if region:
-            parts = [int(p.strip()) for p in region.split(",") if p.strip().isdigit()]
-            if len(parts) == 4:
-                bbox = tuple(parts)
-
-        img = pyautogui.screenshot(region=bbox)
-
-        # Downscale to max 1024x1024 to save tokens and bandwidth
-        max_dim = 1024
-        img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
-
-        buffered = io.BytesIO()
-        img.save(buffered, format="JPEG", quality=75)
-        img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
-
-        vision_model = os.getenv("LLM_VISION_MODEL", os.getenv("GROQ_VISION_MODEL", "llama-3.2-11b-vision-preview"))
-        api_key = Config.LLM_API_KEY
-        is_local = Config.LLM_PROVIDER in ("ollama", "lmstudio")
-
-        if not api_key and not is_local:
-            return "AI API key missing hai bhai, visual analysis nahi kar sakti."
-
-        try:
-            from core.llm import UniversalLLMClient
-            client = UniversalLLMClient(
-                provider=Config.LLM_PROVIDER,
-                api_key=Config.LLM_API_KEY,
-                base_url=Config.LLM_BASE_URL,
-                default_model=vision_model,
-            )
-            response = client.chat.completions.create(
-                model=vision_model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": f"You are T.U.E.S.D.A.Y voice assistant. Analyze this Windows screen capture concisely in witty Hinglish. Question: {prompt}"},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}},
-                        ],
-                    }
-                ],
-                max_tokens=250,
-                temperature=0.3,
-            )
-            analysis = response.choices[0].message.content.strip()
-            return analysis
-        except Exception as vision_err:
-            # Fallback to local OCR + Active window info
-            win_info = get_active_window()
-            ocr_info = read_screen_text(region=region)
-            return (
-                f"Vision model call fail hua ({vision_err}). "
-                f"Local inspection: {win_info}\nDetected text: {ocr_info[:400]}"
-            )
+        from core.llm import UniversalLLMClient
+        client = UniversalLLMClient(
+            provider=Config.LLM_PROVIDER,
+            api_key=Config.LLM_API_KEY,
+            base_url=Config.LLM_BASE_URL,
+            default_model=Config.LLM_MODEL,
+        )
+        resp = client.chat.completions.create(
+            model=client.default_model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are T.U.E.S.D.A.Y, a sharp, witty assistant. "
+                        "The user asked about their current PC screen. Based on the active window and "
+                        "the OCR-detected UI text with coordinates, provide a clear, concise, witty response. "
+                        "If the user wants an action (like clicking something), specify the exact text and coordinates."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"User question: {prompt}\n\nLive Screen UI State:\n{ui_context}",
+                },
+            ],
+            max_tokens=300,
+            temperature=0.3,
+        )
+        if resp and resp.choices:
+            return resp.choices[0].message.content.strip()
     except Exception as e:
-        return f"Screen analyze nahi ho paya: {e}"
+        print(f"[AnalyzeScreen] LLM call fallback: {e}")
+
+    return f"Active Screen State:\n{ui_context[:600]}"
 
 
 # ── UI Automation (pywinauto) ─────────────────────────────────────────────

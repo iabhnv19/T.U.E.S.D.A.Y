@@ -77,14 +77,46 @@ class Tool:
 
     def to_openai_schema(self) -> Dict[str, Any]:
         """Convert to OpenAI / Groq function-calling tool schema."""
+        schema = self.params_schema
+        # Auto-wrap flat property dicts into valid JSON Schema objects.
+        # Many tools define params_schema as {"title": {...}, "content": {...}}
+        # instead of {"type": "object", "properties": {...}, "required": [...]}.
+        if schema and schema.get("type") != "object":
+            # Heuristic: if every value is a dict with a "type" key, it's a
+            # flat properties map that needs wrapping.
+            if all(isinstance(v, dict) and "type" in v for v in schema.values()):
+                schema = {
+                    "type": "object",
+                    "properties": schema,
+                    "required": [
+                        k for k, v in schema.items()
+                        # Mark a property as required only when the matching
+                        # function parameter has no default value.
+                        if not self._param_has_default(k)
+                    ],
+                }
+        elif not schema:
+            schema = {"type": "object", "properties": {}}
         return {
             "type": "function",
             "function": {
                 "name": self.name,
                 "description": self.description,
-                "parameters": self.params_schema,
+                "parameters": schema,
             },
         }
+
+    def _param_has_default(self, param_name: str) -> bool:
+        """Check whether *param_name* has a default value in the wrapped function."""
+        import inspect
+        try:
+            sig = inspect.signature(self.func)
+            p = sig.parameters.get(param_name)
+            if p is None:
+                return False
+            return p.default is not inspect.Parameter.empty
+        except (ValueError, TypeError):
+            return False
 
     def __call__(self, *args, **kwargs):
         return self.func(*args, **kwargs)

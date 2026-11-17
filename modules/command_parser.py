@@ -212,6 +212,11 @@ class CommandParser:
             "unread emails": ("list_unread_emails", {}),
             "check emails": ("list_unread_emails", {}),
             "check mail": ("list_unread_emails", {}),
+            "analyze screen": ("analyze_screen", {}),
+            "what is on my screen": ("analyze_screen", {}),
+            "what's on my screen": ("analyze_screen", {}),
+            "read screen text": ("read_screen_text", {}),
+            "read screen": ("read_screen_text", {}),
         }
 
         # Table of regex patterns for parameter extraction
@@ -336,6 +341,17 @@ class CommandParser:
             (
                 re.compile(r"(?:browser search|search in browser)\s+(.+)", re.I),
                 "browser_search",
+                lambda m: {"query": m.group(1).strip()},
+            ),
+            # OCR Screen Action patterns
+            (
+                re.compile(r"(?:click on text|click text|screen pe click karo|click text on screen)\s+(.+)", re.I),
+                "click_text_on_screen",
+                lambda m: {"text": m.group(1).strip()},
+            ),
+            (
+                re.compile(r"(?:find text|find on screen|screen pe dhoondo)\s+(.+)", re.I),
+                "find_text_on_screen",
                 lambda m: {"query": m.group(1).strip()},
             ),
             # Phase 7 Productivity patterns

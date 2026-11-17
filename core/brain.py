@@ -15,6 +15,64 @@ from core.tools import (
 from modules.web_search import perform_live_web_search
 
 
+class SentenceChunker:
+    """Buffers streaming text and yields clean, complete sentence clauses for real-time TTS."""
+
+    def __init__(self):
+        self.buffer = ""
+        # Delimiters: split ONLY on complete sentence boundaries (. ! ? \n)
+        # Never split on commas or semicolons to avoid unnatural audio loading pauses
+        self.delimiters = re.compile(r'([.!?\n]+(?:\s+|$))')
+
+    def add_token(self, token: str) -> List[str]:
+        self.buffer += token
+        chunks = []
+        while True:
+            match = self.delimiters.search(self.buffer)
+            if not match:
+                # If a single sentence without punctuation is extremely long (>120 chars), break at last space
+                if len(self.buffer) > 120 and " " in self.buffer:
+                    last_space = self.buffer.rfind(" ")
+                    chunk = self.buffer[:last_space].strip()
+                    self.buffer = self.buffer[last_space:].strip()
+                    clean = self._clean(chunk)
+                    if clean:
+                        chunks.append(clean)
+                break
+
+            pos = match.end()
+            chunk = self.buffer[:pos].strip()
+            self.buffer = self.buffer[pos:]
+            clean = self._clean(chunk)
+            if clean:
+                chunks.append(clean)
+        return chunks
+
+    def flush(self) -> List[str]:
+        rem = self._clean(self.buffer.strip())
+        self.buffer = ""
+        return [rem] if rem else []
+
+    @staticmethod
+    def _clean(text: str) -> str:
+        if not text:
+            return ""
+        c = text
+        # Strip markdown code blocks & JSON
+        c = re.sub(r"```(?:json)?\s*[\s\S]*?```", "", c)
+        c = re.sub(r'\{[^{}]*"action"[^{}]*\}', "", c)
+        c = c.replace("```json", "").replace("```", "")
+        # Strip all emojis, pictographs, symbols
+        c = re.sub(r'[\U00010000-\U0010ffff]', '', c)
+        c = re.sub(r'[\u2600-\u27BF]', '', c)
+        c = re.sub(r'[\uD83C-\uDBFF\uDC00-\uDFFF]', '', c)
+        # Compress ellipses and repetitive punctuation to prevent long speech pauses
+        c = re.sub(r'\.{2,}', '.', c)
+        c = re.sub(r'--+', '-', c)
+        c = re.sub(r'[,;]{2,}', ',', c)
+        return c.strip()
+
+
 class AIBrain:
     """Universal AI Brain supporting any LLM provider (Groq, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio)."""
 
@@ -99,22 +157,33 @@ class AIBrain:
         self,
         user_input: str,
         on_status: Optional[Callable[[str], None]] = None,
+        on_sentence: Optional[Callable[[str], None]] = None,
+        on_token: Optional[Callable[[str], None]] = None,
     ) -> str:
         """
         Agentic reasoning loop with persistent SQLite & ChromaDB memory:
         1. Checks safety confirmation gate
         2. Evaluates memory commands (remember, forget, recall)
         3. Semantic memory search and live web injection
-        4. Multi-hop Groq tool execution loop
+        4. Multi-hop Groq tool execution loop with Real-Time Streaming TTS
         5. Synthesizes clean Hinglish dialogue without JSON leaks
         6. Asynchronous durable-fact extraction
         """
         is_local = self.client.provider in ("ollama", "lmstudio")
         if not self.client.api_key and not is_local:
-            return f"{self.client.provider.upper()} API key not configured. Please add LLM_API_KEY to your .env file."
+            msg = f"{self.client.provider.upper()} API key not configured. Please add LLM_API_KEY to your .env file."
+            if on_sentence:
+                on_sentence(msg)
+            return msg
 
         user_lower = user_input.lower().strip()
         self.turn_count += 1
+
+        def _send_fast_reply(text: str) -> str:
+            if on_sentence:
+                on_sentence(text)
+            self._record_dialogue(user_input, text)
+            return text
 
         # ── 1. Check Safety Confirmation Gate ─────────────────────────────
         pending = ConfirmationManager.get_pending()
@@ -128,13 +197,11 @@ class AIBrain:
                     bypass_confirmation=True,
                 )
                 reply = f"Theek hai bhai, maine {pending['tool'].replace('_', ' ')} execute kar diya: {result}"
-                self._record_dialogue(user_input, reply)
-                return reply
+                return _send_fast_reply(reply)
             elif intent == "deny":
                 ConfirmationManager.clear()
                 reply = "Theek hai bhai, action cancel kar diya."
-                self._record_dialogue(user_input, reply)
-                return reply
+                return _send_fast_reply(reply)
             else:
                 ConfirmationManager.clear()
 
@@ -150,8 +217,7 @@ class AIBrain:
             if fact:
                 self.memory.save_fact(fact)
                 reply = f"Theek hai, maine SQLite memory mein yaad rakh liya: {fact}."
-                self._record_dialogue(user_input, reply)
-                return reply
+                return _send_fast_reply(reply)
 
         # Forget fact: "forget that ...", "bhool jao ki ..."
         forget_match = re.search(
@@ -164,8 +230,7 @@ class AIBrain:
             if fact:
                 res = self.memory.forget_fact(fact)
                 reply = f"Theek hai, {res}"
-                self._record_dialogue(user_input, reply)
-                return reply
+                return _send_fast_reply(reply)
 
         # Recall profile / facts: "who am i", "what do you know about me", etc.
         if any(x in user_lower for x in [
@@ -178,8 +243,7 @@ class AIBrain:
                 reply = f"Mujhe tumhare baare mein ye durable facts yaad hain: {facts_text}."
             else:
                 reply = "Abhi mere paas tumhare baare mein koi specific facts save nahi hain, bhai."
-            self._record_dialogue(user_input, reply)
-            return reply
+            return _send_fast_reply(reply)
 
         # ── 3. Semantic Memory Retrieval from Past Conversations ──────────
         memory_snippet = ""
@@ -236,12 +300,14 @@ class AIBrain:
         hop = 0
         final_reply = ""
 
-        # ── 5. Agent Loop with AI Tool Calling ────────────────────────────
+        # ── 5. Agent Loop with AI Tool Calling & Streaming Output ─────────
         while hop < max_hops:
             hop += 1
             response = self._call_groq_with_fallback(messages, tools=tools_schema)
             if not response:
                 final_reply = "Mujhe samajh nahi aaya ya connection issue ho gaya tha, bhai. Ek baar fir se bolna?"
+                if on_sentence:
+                    on_sentence(final_reply)
                 break
 
             choice = response.choices[0]
@@ -251,6 +317,11 @@ class AIBrain:
             if not tool_calls:
                 raw_text = message.content or ""
                 final_reply = self.clean_response(raw_text)
+                if on_sentence and final_reply:
+                    chunker = SentenceChunker()
+                    chunks = chunker.add_token(final_reply) + chunker.flush()
+                    for ch in chunks:
+                        on_sentence(ch)
                 break
 
             # Append assistant's tool-call request to messages
@@ -295,6 +366,8 @@ class AIBrain:
 
         if not final_reply:
             final_reply = "Maine sab execute kar diya hai boss."
+            if on_sentence:
+                on_sentence(final_reply)
 
         # Save to SQLite and ChromaDB
         self._record_dialogue(user_input, final_reply)
@@ -353,14 +426,22 @@ class AIBrain:
         self.conversation.append({"role": "assistant", "content": reply_text})
 
     def clean_response(self, response: str) -> str:
-        """Strip raw action code blocks or JSON markdown so TTS never speaks JSON code aloud."""
+        """Strip raw action code blocks, JSON markdown, and emojis so TTS speaks clean, crisp natural dialogue."""
         if not response:
             return ""
         cleaned = response
         cleaned = re.sub(r"```(?:json)?\s*[\s\S]*?```", "", cleaned)
         cleaned = re.sub(r'\{[^{}]*"action"[^{}]*\}', "", cleaned)
-        cleaned = cleaned.replace("```json", "").replace("```", "").strip()
-        return cleaned
+        cleaned = cleaned.replace("```json", "").replace("```", "")
+        # Strip all emojis and symbols
+        cleaned = re.sub(r'[\U00010000-\U0010ffff]', '', cleaned)
+        cleaned = re.sub(r'[\u2600-\u27BF]', '', cleaned)
+        cleaned = re.sub(r'[\uD83C-\uDBFF\uDC00-\uDFFF]', '', cleaned)
+        # Compress excessive punctuation to eliminate speech pauses
+        cleaned = re.sub(r'\.{2,}', '.', cleaned)
+        cleaned = re.sub(r'--+', '-', cleaned)
+        cleaned = re.sub(r'[,;]{2,}', ',', cleaned)
+        return cleaned.strip()
 
     def extract_action(self, response: str) -> Optional[dict]:
         """Legacy helper for backward-compatibility if needed."""

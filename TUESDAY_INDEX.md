@@ -194,7 +194,9 @@ E:\T.U.E.S.D.A.Y\
 | *"What's on my screen"*, *"Analyze screen"* | `analyze_screen` | Captures screen, downscales to 1024px, and analyzes visual state via Groq Vision API or local OCR. |
 | *"Active window"*, *"Focused window"* | `get_active_window` | Retrieves foreground window title, process name, and PID via Win32. |
 | *"Read this text"*, *"Selected text"* | `get_selected_text` | Preserves clipboard, sends `Ctrl+C`, reads selected text, and restores user's original clipboard. |
-| *"Read screen"*, *"Screen text"* | `read_screen_text` | Performs local OCR using `rapidocr_onnxruntime` on full screen or region. |
+| *"Read screen"*, *"Screen text"* | `read_screen_text` | Performs local dual-engine OCR using `winocr` (Windows Media OCR) and `rapidocr_onnxruntime`. |
+| *"Find text <x>"*, *"Screen pe dhoondo"* | `find_text_on_screen` | Searches for visual text on screen via OCR and returns exact pixel (X, Y) coordinates and bounding box. |
+| *"Click text <x>"*, *"Screen pe click karo"* | `click_text_on_screen` | Visually locates text on screen via OCR and clicks its exact center coordinates with PyAutoGUI. |
 | *"List controls"*, *"Window controls"* | `list_window_controls` | Enumerates accessible buttons, text fields, and UI elements via `pywinauto`. |
 | *"Click <button>"*, *"Button dabao <x>"* | `click_button` | Finds and clicks button by visible label. High-risk safety check on payment/destructive buttons. |
 | *"Type <text> into <field>"* | `type_into_field` | Sets focus and types text into specified input field. |

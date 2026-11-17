@@ -56,7 +56,9 @@ class Config:
     VOICE_RATE: int = int(os.getenv("VOICE_RATE", "175"))
     VOICE_VOLUME: float = float(os.getenv("VOICE_VOLUME", "0.9"))
     VOICE_LANGUAGE: str = os.getenv("VOICE_LANGUAGE", "en-IN")
-    TTS_ENGINE: str = os.getenv("TTS_ENGINE", "auto")
+    TTS_ENGINE: str = os.getenv("TTS_ENGINE", "edge-tts")
+    EDGE_VOICE_EN: str = os.getenv("EDGE_VOICE_EN", "en-IN-NeerjaNeural")
+    EDGE_VOICE_HI: str = os.getenv("EDGE_VOICE_HI", "hi-IN-SwaraNeural")
 
     # City for weather queries
     WEATHER_CITY: str = os.getenv("WEATHER_CITY", "Amritsar")
@@ -83,9 +85,11 @@ class Config:
         "(e.g., 'main kar rahi hoon', 'main bataati hoon', 'soch rahi hoon'). "
         "3. Live web search results will be injected automatically when you need real-time facts, news, or weather. "
         "4. PC AUTOMATION IS FULLY SUPPORTED. You have access to PC automation, window management, media, and system tools via native tool calls. Never say you lack permissions. "
-        "5. Speak naturally with real human emotions! Weave in casual fillers ('Hmm...', 'Umm...', 'Achaa...', 'Ohh...'). "
+        "5. Speak naturally with real human pacing! Weave in casual fillers ('Hmm,', 'Achaa,', 'Ohh,'). "
         "6. Keep responses CONCISE (1-2 sentences). "
-        "7. Never output raw JSON blocks, markdown code blocks, or function code in your final reply. Always speak clean, natural, charming conversational Hinglish based on the tool results."
+        "7. Never output raw JSON blocks, markdown code blocks, or function code in your final reply. Always speak clean, natural, charming conversational Hinglish based on the tool results. "
+        "8. STRICT NO EMOJIS: Do NOT use any emojis, smileys, symbols, or emoticons (like 😊, 😂, 🚀, 👍, etc.) in your responses. Output clean spoken text only. "
+        "9. TIGHT PUNCTUATION: Do not use ellipses ('...'), multiple dots, or excessive commas, to keep speech flowing smoothly without long pauses."
     )
 
     @classmethod
