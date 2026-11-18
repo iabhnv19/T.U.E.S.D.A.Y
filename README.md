@@ -1,5 +1,7 @@
 <div align="center">
 
+<img width="1792" height="592" alt="df" src="https://github.com/user-attachments/assets/deeed3bd-85ba-4514-84fb-bdc87f4e2309" />
+
 # T.U.E.S.D.A.Y
 
 ### Your Windows desktop, on speaking terms.
