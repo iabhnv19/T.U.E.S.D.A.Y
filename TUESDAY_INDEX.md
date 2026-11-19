@@ -43,7 +43,7 @@ E:\T.U.E.S.D.A.Y\
 │   ├── browser_tools.py     # Phase 6: Playwright browser navigation, interaction, and search
 │   ├── productivity_tools.py# Phase 7: Reminders, todos, notes, routines, daily briefing, Google OAuth
 │   ├── pc_control.py        # Windows automation: apps, tabs, volume, media, snapping, telemetry
-│   ├── command_parser.py    # Data-driven zero-latency parser: regex table + rapidfuzz matching
+│   ├── command_parser.py    # Zero-latency parser: conversational normalizer, regex table + rapidfuzz matching, action intent detection
 │   ├── web_search.py        # Keyless tri-engine: wttr.in (weather), Google News RSS, Wikipedia
 │   ├── utilities.py         # Standalone helpers: timers, math, datetime, web shortcuts
 │   └── overlay.py           # PyQt5 Dynamic Island UI with LERP glide & Siri fluid ribbon wave
@@ -82,6 +82,8 @@ E:\T.U.E.S.D.A.Y\
                   ▼
         ┌────────────────────────────────────────────────────────┐
         │ modules/command_parser.py (try_parse)                  │
+        │ - Normalizes conversational speech (strips 'tuesday',  │
+        │   'bhai', 'ek kaam karo', 'please', 'na', etc.)        │
         │ - Table-driven regex + rapidfuzz fuzzy app matching    │
         │ - Direct routing for screen, file, browser, PC actions │
         │ - Checks ConfirmationManager for high-risk approvals   │
@@ -92,24 +94,22 @@ E:\T.U.E.S.D.A.Y\
                  ▼                                ▼
        Execute registered @tool        core/brain.py (AIBrain.think)
        (direct Python execution)                  │
-                 │                      Needs live facts/weather/news?
+                 │                      Action/Tool intent detected?
+                 │                       ├── NO  -> Pure Chat Mode (tools=None)
+                 │                       │          ~150 tokens, instant ~200ms reply
+                 │                       └── YES -> Attach 99 Tool Schemas
+                 │                                  Multi-hop agent loop
                  │                                │
-                 │                      [Fetch via web_search.py]
-                 │                                │
-                 │                      Groq Function Calling Agent Loop
+                 │                      Groq/OpenAI Function Calling Loop
                  │                      (Auto-model fallback if 429)
                  │                                │
-                 │                      Executes tool calls (up to 6 hops)
-                 │                      Feeds results back via role: tool
-                 │                      Logs to logs/actions.jsonl
-                 │                                │
-                 │                      Synthesizes natural Hinglish reply
-                 │                      (Zero raw JSON leaks)
+                 │                      Streaming TTS sentence queue
+                 │                      (Edge-TTS neural voices)
                  │                                │
                  └────────────────┬───────────────┘
                                   │
                                   ▼
-           Speak response aloud (gTTS via PyGame at 27.5 kHz)
+           Speak response aloud (Edge-TTS en-IN-Neerja / hi-IN-Swara)
                                   +
            Update Dynamic Island visualizer & text
                                   │

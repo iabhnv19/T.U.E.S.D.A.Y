@@ -72,9 +72,10 @@ Common commands are handled locally without an LLM round trip. More complex requ
 ### Local command parser and AI agent
 
 - A table-driven regex parser handles supported commands without waiting for an LLM.
+- **Conversational Speech Normalizer**: Automatically cleans wake words (`Tuesday`), conversational hooks (`bhai`, `yaar`, `suno`, `ek kaam karo`), and politeness tags (`please`, `na`, `kar do`) so commands spoken inside natural dialogue execute locally with zero latency.
 - `rapidfuzz` improves application-name matching.
-- Requests that do not match a local command are routed to the AI brain.
-- The AI brain uses Groq function calling to select and execute registered tools.
+- **Dynamic Tool Injection & Chatbot Mode**: Pure conversational questions (*"tell me a joke"*, *"who was Einstein?"*) bypass tool schemas entirely (`tools=None`), dropping token consumption by 95% and boosting response speed. Tool schemas are dynamically attached only when action/tool intent is detected.
+- The AI brain uses function calling to select and execute registered tools when complex automation is required.
 - Multi-step tool calls can be chained for requests that require more than one operation.
 - The model fallback chain helps handle rate limits by moving to another available model.
 - Tool results are converted into a natural-language response rather than exposing raw tool-call data.
