@@ -32,6 +32,96 @@ def _match_app_fuzzy(raw_name: str) -> str:
     return clean
 
 
+def normalize_command_text(text: str) -> str:
+    """
+    Clean conversational filler words, assistant names, and polite phrasing from spoken text.
+    E.g.: 'Tuesday please open chrome' -> 'open chrome'
+          'Bhai volume 50 kar do' -> 'volume 50'
+          'Acha suno gaana roko' -> 'gaana roko'
+    """
+    if not text:
+        return ""
+    clean = text.lower().strip()
+
+    # Strip wake-word / greeting prefixes
+    clean = re.sub(r"^(?:hey\s+|hi\s+|hello\s+|ok\s+|okay\s+)?tuesday[,:\s]*", "", clean, flags=re.IGNORECASE)
+
+    # Iteratively strip conversational lead-ins
+    prefix_patterns = [
+        r"^(?:please|kripya|kindly)\s+",
+        r"^(?:can\s+you|could\s+you|would\s+you)(?:\s+please)?\s+",
+        r"^(?:bhai|yaar|dost|bro|sir|boss)\s+",
+        r"^(?:suno|sun|achha\s+suno|achha|acha|zara|zarra|dekh|dekho)\s+",
+        r"^(?:ek\s+kaam\s+karo|ek\s+kaam\s+kar|ek\s+cheez\s+karo)\s+",
+        r"^(?:just|jaldi\s+se|fatfat|jaldi)\s+",
+        r"^(?:mujhe|meri|mera)\s+",
+    ]
+    changed = True
+    while changed:
+        old = clean
+        for pat in prefix_patterns:
+            clean = re.sub(pat, "", clean, flags=re.IGNORECASE).strip()
+        # In case wake-word followed filler e.g. "bhai tuesday open chrome"
+        clean = re.sub(r"^tuesday[,:\s]*", "", clean, flags=re.IGNORECASE).strip()
+        changed = (old != clean)
+
+    # Strip trailing polite tags or colloquial endings
+    suffix_patterns = [
+        r"\s+(?:please|kindly)$",
+        r"\s+(?:na|yaar|bhai|bro|boss)$",
+        r"\s+(?:jaldi|turant|fast|now)$",
+        r"\s+(?:kardo|kar\s+do|karna|karo)$",
+    ]
+    for spat in suffix_patterns:
+        clean = re.sub(spat, "", clean, flags=re.IGNORECASE).strip()
+
+    return clean
+
+
+ACTION_KEYWORDS = {
+    # Apps & Execution
+    "open", "launch", "start", "run", "close", "kill", "quit", "exit", "focus", "switch",
+    "kholo", "khol", "chalao", "chala", "band", "hatao", "rok", "roko",
+    # Screen & Vision & OCR
+    "screen", "screenshot", "ocr", "click", "button", "type", "field", "window",
+    "maximize", "minimize", "snap", "controls", "desktop", "padho", "read", "dekho",
+    # Media & Audio & System
+    "volume", "awaaz", "mute", "unmute", "brightness", "media", "music", "gaana",
+    "song", "play", "pause", "skip", "next", "previous", "track",
+    # Hardware & Diagnostics
+    "shutdown", "restart", "reboot", "lock", "ram", "cpu", "specs", "network", "ping", "ip", "battery",
+    # Productivity
+    "reminder", "remind", "alarm", "timer", "todo", "task", "note", "routine", "briefing",
+    "schedule", "email", "mail", "unread", "calendar",
+    # Files & Storage
+    "file", "folder", "directory", "files", "zip", "compress", "move", "rename", "delete",
+    "summarize", "docx", "pdf", "organize", "trash", "recycle",
+    # Math & Computation
+    "calculate", "computation", "compute", "multiplied", "multiply", "divide", "divided",
+    "plus", "minus", "hisab", "math",
+    # Action verbs
+    "kardo", "kar do", "banao", "likho", "dikhado", "dikhao", "dhundo",
+}
+
+
+def has_action_intent(text: str) -> bool:
+    """
+    Determine if a spoken text indicates an intent to execute a PC/OS/productivity tool.
+    Returns False for pure conversational queries (e.g. 'Tell me a joke', 'Who is Iron Man?').
+    """
+    if not text:
+        return False
+    lower = text.lower()
+    words = set(re.findall(r"\b\w+\b", lower))
+    if bool(words.intersection(ACTION_KEYWORDS)):
+        return True
+    # Math expressions like "7 * 8" or "15 + 20"
+    if re.search(r"\d+\s*[\+\-\*\/\^x÷]\s*\d+", lower):
+        return True
+    phrases = ["kar do", "khol do", "band karo", "chala do", "likh do", "bata do mausam", "yaad rakhna", "bhool jao"]
+    return any(p in lower for p in phrases)
+
+
 class CommandParser:
     """Pre-processes spoken queries with table-driven pattern matching and direct tool invocation."""
 
@@ -447,17 +537,24 @@ class CommandParser:
         clean = text.lower().strip()
         if not clean:
             return None
-        if clean in self._exact_commands:
-            tool_name, args = self._exact_commands[clean]
-            return {"tool": tool_name, "args": args}
-        for pattern, tool_name, arg_fn in self._pattern_table:
-            m = pattern.search(clean)
-            if m:
-                try:
-                    args = arg_fn(m)
-                    return {"tool": tool_name, "args": args}
-                except Exception:
-                    return {"tool": tool_name, "args": {}}
+
+        candidates = [clean]
+        norm = normalize_command_text(clean)
+        if norm and norm != clean:
+            candidates.append(norm)
+
+        for candidate in candidates:
+            if candidate in self._exact_commands:
+                tool_name, args = self._exact_commands[candidate]
+                return {"tool": tool_name, "args": args}
+            for pattern, tool_name, arg_fn in self._pattern_table:
+                m = pattern.search(candidate)
+                if m:
+                    try:
+                        args = arg_fn(m)
+                        return {"tool": tool_name, "args": args}
+                    except Exception:
+                        return {"tool": tool_name, "args": {}}
         return None
 
     def try_parse(self, text: str) -> Optional[str]:
@@ -485,31 +582,37 @@ class CommandParser:
                 ConfirmationManager.clear()
                 return "Cancelled. Action aborted."
 
-        # ── 2. Check Exact Match Commands ─────────────────────────────────
-        if clean in self._exact_commands:
-            tool_name, args = self._exact_commands[clean]
-            return execute_tool(tool_name, args)
+        candidates = [clean]
+        norm = normalize_command_text(clean)
+        if norm and norm != clean:
+            candidates.append(norm)
 
-        # ── 3. Check Regex Pattern Table ──────────────────────────────────
-        for pattern, tool_name, arg_fn in self._pattern_table:
-            m = pattern.search(clean)
-            if m:
-                # If notepad write is creative/long-form essay, delegate to AI brain
-                if tool_name == "notepad_write":
-                    content = m.group(1).lower()
-                    if any(k in content for k in ["paragraph", "essay", "story", "lines on", "about", "article", "poem"]):
-                        return None
+        for candidate in candidates:
+            # ── 2. Check Exact Match Commands ─────────────────────────────
+            if candidate in self._exact_commands:
+                tool_name, args = self._exact_commands[candidate]
+                return execute_tool(tool_name, args)
 
-                # Ignore sleep commands from app opening
-                if tool_name in ("open_app", "focus_window"):
-                    target = m.group(1).strip().lower()
-                    if target in ("sleep", "so jao", "bed", "listening"):
-                        return None
+            # ── 3. Check Regex Pattern Table ──────────────────────────────
+            for pattern, tool_name, arg_fn in self._pattern_table:
+                m = pattern.search(candidate)
+                if m:
+                    # If notepad write is creative/long-form essay, delegate to AI brain
+                    if tool_name == "notepad_write":
+                        content = m.group(1).lower()
+                        if any(k in content for k in ["paragraph", "essay", "story", "lines on", "about", "article", "poem"]):
+                            return None
 
-                try:
-                    args = arg_fn(m)
-                    return execute_tool(tool_name, args)
-                except Exception as e:
-                    return f"Error running {tool_name}: {e}"
+                    # Ignore sleep commands from app opening
+                    if tool_name in ("open_app", "focus_window"):
+                        target = m.group(1).strip().lower()
+                        if target in ("sleep", "so jao", "bed", "listening"):
+                            return None
+
+                    try:
+                        args = arg_fn(m)
+                        return execute_tool(tool_name, args)
+                    except Exception as e:
+                        return f"Error running {tool_name}: {e}"
 
         return None

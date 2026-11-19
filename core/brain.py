@@ -151,7 +151,6 @@ class AIBrain:
             print(f"[{Config.NAME}] Switching to fallback model: {next_model}")
             return next_model
         return None
-        return None
 
     def think(
         self,
@@ -295,7 +294,12 @@ class AIBrain:
         messages.extend(self.conversation[-9:-1])
         messages.append({"role": "user", "content": current_enriched})
 
-        tools_schema = get_tool_schemas()
+        # Dynamically attach tool schemas ONLY if action/tool intent is detected
+        # Pure conversational chat skips tools completely to save rate limits & boost speed
+        from modules.command_parser import has_action_intent
+        needs_tools = has_action_intent(user_input) or bool(ConfirmationManager.get_pending())
+
+        tools_schema = get_tool_schemas() if needs_tools else None
         max_hops = 6
         hop = 0
         final_reply = ""
