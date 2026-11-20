@@ -102,7 +102,7 @@ def browser_open(url: str = "https://www.google.com") -> str:
     if not BrowserSession.is_enabled():
         return "Browser automation .env mein disabled hai (ENABLE_PLAYWRIGHT=false)."
     if not HAS_PLAYWRIGHT:
-        return "Playwright library install nahi hai bhai. Use 'pip install playwright' and 'playwright install chromium'."
+        return "Playwright library install nahi hai Sir. Use 'pip install playwright' and 'playwright install chromium'."
 
     if not url.startswith("http://") and not url.startswith("https://"):
         url = "https://" + url

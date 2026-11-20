@@ -9,7 +9,7 @@
 - **Name**: T.U.E.S.D.A.Y (Tactical Unified Electronic Systematic Digital Assistant)
 - **Role**: Lightweight, proactive, Windows desktop voice assistant inspired by Friday/JARVIS.
 - **Persona**: Female voice, sharp, witty, warm, conversational Hinglish (Hindi + English) speaker. Strict no-emoji rule and tight natural punctuation cadence.
-- **User Gender**: Male (`karoge`, `tum sunao`, `bhai`, `dost`).
+- **User Gender**: Male, addressed respectfully as 'Sir' or 'Boss' (`karoge`, `aap sunao`, `Sir`, `Boss`). Strict ban on 'bhai'.
 - **Core Loop**: Global Hotkey (`Right Shift + Enter`) → Continuous Active Listening until 5s silence → Local Regex Command Parser (Zero API Latency) → Universal LLM Brain with tool-calling agent loop (Groq, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio) → Real-Time Streaming Neural Voice (Edge-TTS `en-IN-NeerjaNeural` / `hi-IN-SwaraNeural`) with instant mid-generation playback (~0.3s start) and real-time Barge-In cancellation → Floating OLED Dynamic Island Overlay UI.
 
 ---

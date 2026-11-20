@@ -144,7 +144,7 @@ class TestPhase7RoutinesAndBriefing:
         res = prod_tools.get_daily_briefing()
         assert isinstance(res, str)
         assert len(res) > 50
-        assert "bhai!" in res
+        assert "Sir!" in res or "bhai!" in res
         assert "Weather" in res or "Reminders" in res or "India Block" in res
 
 

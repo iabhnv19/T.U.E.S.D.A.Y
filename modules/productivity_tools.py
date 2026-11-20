@@ -119,7 +119,7 @@ def add_reminder(
     mem = MemoryStore()
     rem_id = mem.add_reminder(text, target_ts, recurring=recurring)
     rec_str = f" ({recurring} recurring)" if recurring and recurring != "none" else ""
-    return f"Reminder set ho gaya bhai! ID #{rem_id}: '{text}' at {due_str}{rec_str}."
+    return f"Reminder set ho gaya Sir! ID #{rem_id}: '{text}' at {due_str}{rec_str}."
 
 
 @tool(
@@ -138,7 +138,7 @@ def list_reminders(include_completed: bool = False) -> str:
     mem = MemoryStore()
     rems = mem.get_all_reminders(include_completed=include_completed)
     if not rems:
-        return "Koi active reminders schedule nahi hain bhai."
+        return "Koi active reminders schedule nahi hain Sir."
 
     lines = []
     for r in rems:
@@ -166,7 +166,7 @@ def delete_reminder(reminder_id: int) -> str:
     mem = MemoryStore()
     success = mem.delete_reminder(reminder_id)
     if success:
-        return f"Reminder #{reminder_id} delete kar diya bhai."
+        return f"Reminder #{reminder_id} delete kar diya Sir."
     return f"Reminder #{reminder_id} nahi mila."
 
 
@@ -481,7 +481,7 @@ def get_daily_briefing() -> str:
     sections: List[str] = []
     now = datetime.now()
     greeting_time = "Good Morning" if now.hour < 12 else ("Good Afternoon" if now.hour < 17 else "Good Evening")
-    sections.append(f"🌅 {greeting_time} bhai! Here is your daily briefing for {now.strftime('%A, %d %B %Y')}:\n")
+    sections.append(f"🌅 {greeting_time} Sir! Here is your daily briefing for {now.strftime('%A, %d %B %Y')}:\n")
 
     # 1. Weather
     try:
@@ -685,7 +685,7 @@ def list_unread_emails(max_results: int = 5) -> str:
         messages = results.get("messages", [])
 
         if not messages:
-            return "Gmail mein koi unread emails nahi hain bhai!"
+            return "Gmail mein koi unread emails nahi hain Sir!"
 
         lines = []
         for msg in messages:

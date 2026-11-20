@@ -303,7 +303,7 @@ class Tuesday:
         if hasattr(self, "overlay") and self.overlay:
             self.overlay.show_status("alert", f"⏰ {msg}", auto_hide_ms=6000)
         rec_tag = " (Daily)" if recurring == "daily" else (" (Weekly)" if recurring == "weekly" else "")
-        self.voice.speak_async(f"Bhai, aapka reminder hai: {title}{rec_tag}")
+        self.voice.speak_async(f"Sir, aapka reminder hai: {title}{rec_tag}")
 
     def _quit(self):
         """Clean shutdown."""

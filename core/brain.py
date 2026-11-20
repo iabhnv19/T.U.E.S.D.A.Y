@@ -195,11 +195,11 @@ class AIBrain:
                     pending.get("args", {}),
                     bypass_confirmation=True,
                 )
-                reply = f"Theek hai bhai, maine {pending['tool'].replace('_', ' ')} execute kar diya: {result}"
+                reply = f"Theek hai Sir, maine {pending['tool'].replace('_', ' ')} execute kar diya: {result}"
                 return _send_fast_reply(reply)
             elif intent == "deny":
                 ConfirmationManager.clear()
-                reply = "Theek hai bhai, action cancel kar diya."
+                reply = "Theek hai Sir, action cancel kar diya."
                 return _send_fast_reply(reply)
             else:
                 ConfirmationManager.clear()
@@ -239,9 +239,9 @@ class AIBrain:
             facts = self.memory.recall_facts()
             if facts:
                 facts_text = "; ".join([f"{f['key']}: {f['value']}" for f in facts[:8]])
-                reply = f"Mujhe tumhare baare mein ye durable facts yaad hain: {facts_text}."
+                reply = f"Mujhe aapke baare mein ye durable facts yaad hain Sir: {facts_text}."
             else:
-                reply = "Abhi mere paas tumhare baare mein koi specific facts save nahi hain, bhai."
+                reply = "Abhi mere paas aapke baare mein koi specific facts save nahi hain, Sir."
             return _send_fast_reply(reply)
 
         # ── 3. Semantic Memory Retrieval from Past Conversations ──────────
@@ -309,7 +309,7 @@ class AIBrain:
             hop += 1
             response = self._call_groq_with_fallback(messages, tools=tools_schema)
             if not response:
-                final_reply = "Mujhe samajh nahi aaya ya connection issue ho gaya tha, bhai. Ek baar fir se bolna?"
+                final_reply = "Mujhe samajh nahi aaya ya connection issue ho gaya tha, Sir. Ek baar fir se bolna?"
                 if on_sentence:
                     on_sentence(final_reply)
                 break

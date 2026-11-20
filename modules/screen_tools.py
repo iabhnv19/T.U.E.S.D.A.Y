@@ -65,7 +65,7 @@ def get_active_window() -> str:
     try:
         hwnd = win32gui.GetForegroundWindow()
         if not hwnd:
-            return "Koi active window detect nahi hui bhai, ho sakta hai desktop focused ho."
+            return "Koi active window detect nahi hui Sir, ho sakta hai desktop focused ho."
 
         title = win32gui.GetWindowText(hwnd) or "Untitled Window"
         thread_id, pid = win32process.GetWindowThreadProcessId(hwnd)
@@ -256,7 +256,7 @@ def _extract_ocr_elements(img, offset_x: int = 0, offset_y: int = 0) -> List[Dic
 def read_screen_text(region: Optional[str] = None, with_coordinates: bool = False) -> str:
     """Perform local OCR on screen capture and return layout-preserved text."""
     if not HAS_OCR:
-        return "Local OCR modules (winocr / rapidocr) available nahi hain bhai."
+        return "Local OCR modules (winocr / rapidocr) available nahi hain Sir."
 
     img, ox, oy = _capture_screenshot(region)
     if img is None:
@@ -494,7 +494,7 @@ def analyze_screen(
 def list_window_controls(window_title: Optional[str] = None) -> str:
     """Inspect UI controls of the focused window."""
     if not HAS_PYWINAUTO:
-        return "pywinauto library install nahi hai bhai."
+        return "pywinauto library install nahi hai Sir."
 
     try:
         desktop = Desktop(backend="uia")
@@ -570,7 +570,7 @@ def click_button(button_name: str, window_title: Optional[str] = None) -> str:
 
         if btn.exists(timeout=2):
             btn.click_input()
-            return f"Button '{button_name}' click kar diya bhai."
+            return f"Button '{button_name}' click kar diya Sir."
         else:
             return f"'{button_name}' button window mein nahi mila."
     except Exception as e:

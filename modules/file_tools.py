@@ -219,7 +219,7 @@ def read_file_content(file_path: str, max_chars: int = 4000) -> str:
 def read_pdf(file_path: str, max_pages: int = 10) -> str:
     """Extract text from PDF."""
     if not HAS_PYPDF:
-        return "PDF reader (PyPDF2) library install nahi hai bhai."
+        return "PDF reader (PyPDF2) library install nahi hai Sir."
 
     p = Path(file_path)
     if not p.exists():
@@ -262,7 +262,7 @@ def read_pdf(file_path: str, max_pages: int = 10) -> str:
 def read_docx(file_path: str) -> str:
     """Extract text from Word document."""
     if not HAS_DOCX:
-        return "DOCX reader (python-docx) library install nahi hai bhai."
+        return "DOCX reader (python-docx) library install nahi hai Sir."
 
     p = Path(file_path)
     if not p.exists():
@@ -565,7 +565,7 @@ def index_folder(folder_path: str) -> str:
     """Chunk and embed local documents for RAG search."""
     col = _get_doc_collection()
     if not col:
-        return "ChromaDB memory store ready nahi hai bhai."
+        return "ChromaDB memory store ready nahi hai Sir."
 
     folder = Path(folder_path)
     if not folder.exists() or not folder.is_dir():
