@@ -1,15 +1,24 @@
 # Environment & Secrets
 .env
+.env.*
+!.env.example
 credentials.json
 *token*.json
+client_secret*.json
 
 # Python Bytecode & Cache
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.pytest_cache/
 
-# Assistant runtime persistence
+# Execution Logs & User Audit History (Never push user commands/history to GitHub)
+logs/
+*.jsonl
+undo_journal.json
+
+# Assistant runtime persistence & User Data (Local database, vector DB, notes, profile)
 memory/
 saved_links.txt
 screenshot*.png
@@ -23,6 +32,7 @@ screenshot*.png
 *.swo
 Thumbs.db
 Desktop.ini
+.DS_Store
 
 # Legacy models
 vosk-model*/
