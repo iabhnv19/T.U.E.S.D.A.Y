@@ -66,6 +66,30 @@ def test_command_parser_conversational_wrappers():
     assert res is None
 
 
+def test_command_parser_fuzzy_commands():
+    """Verify fuzzy matching catches misrecognitions and speech variations."""
+    pc = PCController()
+    utils = Utilities()
+    parser = CommandParser(pc, utils)
+
+    # Fuzzy matches for exact commands
+    parsed = parser.parse("gaana rok do")
+    assert parsed is not None
+    assert parsed["tool"] == "media_play_pause"
+
+    parsed = parser.parse("awaaz kam kar do")
+    assert parsed is not None
+    assert parsed["tool"] == "volume_down"
+
+    parsed = parser.parse("screenshot le lo")
+    assert parsed is not None
+    assert parsed["tool"] == "take_screenshot"
+
+    parsed = parser.parse("sound badhao")
+    assert parsed is not None
+    assert parsed["tool"] == "volume_up"
+
+
 def test_brain_skips_tools_for_conversational_chat():
     """Verify AIBrain passes tools=None to LLM for conversational chit-chat queries."""
     brain = AIBrain()

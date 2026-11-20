@@ -32,11 +32,16 @@ class VoiceEngine:
         self._setup_fallback_voice()
 
         self.recognizer = sr.Recognizer()
-        self.recognizer.energy_threshold = 300
+        self.recognizer.energy_threshold = 250
         self.recognizer.dynamic_energy_threshold = True
-        self.recognizer.pause_threshold = 0.8
+        self.recognizer.dynamic_energy_adjustment_damping = 0.15
+        self.recognizer.dynamic_energy_ratio = 1.5
+        self.recognizer.pause_threshold = 1.2  # 1.2s prevents premature cutoff on natural pauses
+        self.recognizer.phrase_threshold = 0.3
+        self.recognizer.non_speaking_duration = 0.6
         self._is_listening = False
         self._stop_speaking_flag = False
+        self._calibrated = False
 
         # Streaming TTS sentence queue
         self._sentence_queue: queue.Queue = queue.Queue()
@@ -263,12 +268,20 @@ class VoiceEngine:
 
         try:
             with sr.Microphone() as source:
-                self.recognizer.adjust_for_ambient_noise(source, duration=0.4)
+                # Calibrate once on startup instead of every turn to prevent user speech from inflating noise floor
+                if not self._calibrated:
+                    self.recognizer.adjust_for_ambient_noise(source, duration=0.3)
+                    if self.recognizer.energy_threshold > 400:
+                        self.recognizer.energy_threshold = 280
+                    elif self.recognizer.energy_threshold < 150:
+                        self.recognizer.energy_threshold = 200
+                    self._calibrated = True
 
                 if on_partial:
                     on_partial("Listening...")
 
-                audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=10.0)
+                # phrase_time_limit=12.0 gives ample time for complete thoughts without word trimming
+                audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=12.0)
 
                 if on_partial:
                     on_partial("Processing...")

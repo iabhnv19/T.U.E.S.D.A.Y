@@ -142,31 +142,51 @@ class CommandParser:
             "play music": ("media_play_pause", {}),
             "chalao": ("media_play_pause", {}),
             "gaana chalao": ("media_play_pause", {}),
+            "gaana bajao": ("media_play_pause", {}),
+            "gaana chala do": ("media_play_pause", {}),
+            "music chalao": ("media_play_pause", {}),
             "roko": ("media_play_pause", {}),
             "gaana roko": ("media_play_pause", {}),
+            "gaana rok do": ("media_play_pause", {}),
+            "music roko": ("media_play_pause", {}),
+            "pause karo": ("media_play_pause", {}),
+            "play karo": ("media_play_pause", {}),
             "next": ("media_next", {}),
             "next track": ("media_next", {}),
             "next song": ("media_next", {}),
             "skip": ("media_next", {}),
             "agla gaana": ("media_next", {}),
+            "agla song": ("media_next", {}),
             "agla": ("media_next", {}),
             "previous": ("media_previous", {}),
             "previous track": ("media_previous", {}),
             "previous song": ("media_previous", {}),
             "prev": ("media_previous", {}),
             "pichla gaana": ("media_previous", {}),
+            "pichla song": ("media_previous", {}),
             "mute": ("volume_mute", {}),
             "unmute": ("volume_mute", {}),
             "shant": ("volume_mute", {}),
             "awaaz band": ("volume_mute", {}),
+            "mute audio": ("volume_mute", {}),
+            "mute karo": ("volume_mute", {}),
+            "unmute karo": ("volume_mute", {}),
 
             # Volume steps
             "volume up": ("volume_up", {"amount": 5}),
             "awaaz badhao": ("volume_up", {"amount": 5}),
+            "volume badhao": ("volume_up", {"amount": 5}),
+            "volume badha do": ("volume_up", {"amount": 5}),
             "increase volume": ("volume_up", {"amount": 5}),
+            "sound badhao": ("volume_up", {"amount": 5}),
+            "awaaz tez karo": ("volume_up", {"amount": 5}),
             "volume down": ("volume_down", {"amount": 5}),
             "awaaz kam karo": ("volume_down", {"amount": 5}),
+            "volume kam karo": ("volume_down", {"amount": 5}),
+            "volume kam kar do": ("volume_down", {"amount": 5}),
             "decrease volume": ("volume_down", {"amount": 5}),
+            "sound kam karo": ("volume_down", {"amount": 5}),
+            "awaaz dheere karo": ("volume_down", {"amount": 5}),
 
             # Window layout
             "snap left": ("snap_left", {}),
@@ -189,8 +209,13 @@ class CommandParser:
 
             # Screen & Diagnostics
             "screenshot": ("take_screenshot", {}),
+            "screen shot": ("take_screenshot", {}),
             "take screenshot": ("take_screenshot", {}),
+            "take a screenshot": ("take_screenshot", {}),
             "screenshot lo": ("take_screenshot", {}),
+            "screenshot le lo": ("take_screenshot", {}),
+            "screenshot kheencho": ("take_screenshot", {}),
+            "screenshot kheench do": ("take_screenshot", {}),
             "start recording": ("start_screen_recording", {}),
             "record screen": ("start_screen_recording", {}),
             "screen recording start": ("start_screen_recording", {}),
@@ -555,6 +580,15 @@ class CommandParser:
                         return {"tool": tool_name, "args": args}
                     except Exception:
                         return {"tool": tool_name, "args": {}}
+
+        # ── 4. Fuzzy Command Matcher ──────────────────────────────────
+        for candidate in candidates:
+            if len(candidate) >= 4 and has_action_intent(candidate):
+                match = process.extractOne(candidate, list(self._exact_commands.keys()), scorer=fuzz.ratio)
+                if match and match[1] >= 80:
+                    tool_name, args = self._exact_commands[match[0]]
+                    return {"tool": tool_name, "args": args}
+
         return None
 
     def try_parse(self, text: str) -> Optional[str]:
@@ -614,5 +648,13 @@ class CommandParser:
                         return execute_tool(tool_name, args)
                     except Exception as e:
                         return f"Error running {tool_name}: {e}"
+
+        # ── 4. Fuzzy Command Matcher ──────────────────────────────────
+        for candidate in candidates:
+            if len(candidate) >= 4 and has_action_intent(candidate):
+                match = process.extractOne(candidate, list(self._exact_commands.keys()), scorer=fuzz.ratio)
+                if match and match[1] >= 80:
+                    tool_name, args = self._exact_commands[match[0]]
+                    return execute_tool(tool_name, args)
 
         return None
