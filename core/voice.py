@@ -143,6 +143,34 @@ class VoiceEngine:
 
         return False
 
+    @staticmethod
+    def _clean_for_tts(text: str) -> str:
+        """Strip markdown markers, asterisks, and pronounce acronyms properly for TTS."""
+        if not text:
+            return ""
+        c = text
+        # Strip code blocks
+        c = re.sub(r"```[\s\S]*?```", "", c)
+        # Strip markdown bold, italics, inline code, headers, bullets, strikethrough
+        c = re.sub(r"\*\*([^*]+)\*\*", r"\1", c)  # **text** -> text
+        c = re.sub(r"\*([^*]+)\*", r"\1", c)      # *text* -> text
+        c = re.sub(r"__([^_]+)__", r"\1", c)
+        c = re.sub(r"_([^_]+)_", r"\1", c)
+        c = re.sub(r"`([^`]+)`", r"\1", c)
+        c = re.sub(r"~~([^~]+)~~", r"\1", c)
+        c = re.sub(r"[*_~#`>]", "", c)            # Stray asterisks or markdown symbols
+        # Pronounce T.U.E.S.D.A.Y cleanly as "Tuesday"
+        c = re.sub(r"\bT\.?U\.?E\.?S\.?D\.?A\.?Y\.?\b", "Tuesday", c, flags=re.IGNORECASE)
+        # Remove emojis
+        c = re.sub(r'[\U00010000-\U0010ffff]', '', c)
+        c = re.sub(r'[\u2600-\u27BF]', '', c)
+        c = re.sub(r'[\uD83C-\uDBFF\uDC00-\uDFFF]', '', c)
+        # Compress excessive dots / commas
+        c = re.sub(r'\.{2,}', '.', c)
+        c = re.sub(r'--+', '-', c)
+        c = re.sub(r'[,;]{2,}', ',', c)
+        return c.strip()
+
     def _speak_phrase(self, text: str):
         """Speak a single phrase/sentence synchronously."""
         if not text or not text.strip():
@@ -150,7 +178,9 @@ class VoiceEngine:
         if self._stop_speaking_flag:
             return
 
-        clean = text.strip()
+        clean = self._clean_for_tts(text)
+        if not clean:
+            return
 
         if self._pygame_ready:
             temp_path = None
@@ -206,11 +236,12 @@ class VoiceEngine:
 
     def speak_stream_chunk(self, sentence: str):
         """Enqueue a newly completed sentence from the LLM for immediate speech synthesis."""
-        if not sentence or not sentence.strip() or self._stop_speaking_flag:
+        clean = self._clean_for_tts(sentence)
+        if not clean or self._stop_speaking_flag:
             return
         if not self._is_streaming:
             self.start_speech_stream()
-        self._sentence_queue.put(sentence.strip())
+        self._sentence_queue.put(clean)
 
     def finish_speech_stream(self, wait: bool = True):
         """Mark end of streaming input and wait for queued audio playback to complete."""

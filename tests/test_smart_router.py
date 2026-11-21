@@ -125,3 +125,29 @@ def test_brain_attaches_tools_for_action_queries():
         _, kwargs = mock_complete.call_args
         assert kwargs.get("tools") is not None
         assert len(kwargs["tools"]) > 0
+
+
+def test_markdown_and_acronym_stripping():
+    """Verify asterisks and markdown symbols are stripped and acronyms pronounce cleanly."""
+    from core.brain import SentenceChunker
+    from core.voice import VoiceEngine
+
+    brain = AIBrain()
+
+    # Asterisks stripped from SentenceChunker
+    assert SentenceChunker._clean("**hii** Sir, *kaise* ho?") == "hii Sir, kaise ho?"
+    assert SentenceChunker._clean("T.U.E.S.D.A.Y online") == "Tuesday online"
+
+    # Asterisks stripped from AIBrain.clean_response
+    raw_llm = "**hii** Sir! Main aapki help ke liye ready hoon. **T.U.E.S.D.A.Y** operational."
+    cleaned = brain.clean_response(raw_llm)
+    assert "**" not in cleaned
+    assert "*" not in cleaned
+    assert "Tuesday" in cleaned
+    assert "T.U.E.S.D.A.Y" not in cleaned
+
+    # Asterisks stripped in VoiceEngine
+    tts_text = VoiceEngine._clean_for_tts("### **Header**: Hello *world*! T.U.E.S.D.A.Y.")
+    assert tts_text == "Header: Hello world! Tuesday."
+    assert "*" not in tts_text
+    assert "#" not in tts_text

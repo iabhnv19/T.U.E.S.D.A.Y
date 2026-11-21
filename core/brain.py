@@ -62,6 +62,16 @@ class SentenceChunker:
         c = re.sub(r"```(?:json)?\s*[\s\S]*?```", "", c)
         c = re.sub(r'\{[^{}]*"action"[^{}]*\}', "", c)
         c = c.replace("```json", "").replace("```", "")
+        # Strip markdown bold, italics, inline code, headers, bullets, strikethrough
+        c = re.sub(r"\*\*([^*]+)\*\*", r"\1", c)  # **bold** -> bold
+        c = re.sub(r"\*([^*]+)\*", r"\1", c)      # *italic* -> italic
+        c = re.sub(r"__([^_]+)__", r"\1", c)      # __bold__ -> bold
+        c = re.sub(r"_([^_]+)_", r"\1", c)        # _italic_ -> italic
+        c = re.sub(r"`([^`]+)`", r"\1", c)        # `code` -> code
+        c = re.sub(r"~~([^~]+)~~", r"\1", c)      # ~~strikethrough~~ -> strikethrough
+        c = re.sub(r"[*_~#`>]", "", c)            # Stray asterisks, hashes, backticks
+        # Pronounce T.U.E.S.D.A.Y cleanly as "Tuesday"
+        c = re.sub(r"\bT\.?U\.?E\.?S\.?D\.?A\.?Y\.?\b", "Tuesday", c, flags=re.IGNORECASE)
         # Strip all emojis, pictographs, symbols
         c = re.sub(r'[\U00010000-\U0010ffff]', '', c)
         c = re.sub(r'[\u2600-\u27BF]', '', c)
@@ -430,13 +440,23 @@ class AIBrain:
         self.conversation.append({"role": "assistant", "content": reply_text})
 
     def clean_response(self, response: str) -> str:
-        """Strip raw action code blocks, JSON markdown, and emojis so TTS speaks clean, crisp natural dialogue."""
+        """Strip raw action code blocks, JSON markdown, asterisks, and emojis so TTS speaks clean dialogue."""
         if not response:
             return ""
         cleaned = response
         cleaned = re.sub(r"```(?:json)?\s*[\s\S]*?```", "", cleaned)
         cleaned = re.sub(r'\{[^{}]*"action"[^{}]*\}', "", cleaned)
         cleaned = cleaned.replace("```json", "").replace("```", "")
+        # Strip markdown bold, italics, inline code, headers, bullets, strikethrough
+        cleaned = re.sub(r"\*\*([^*]+)\*\*", r"\1", cleaned)  # **bold** -> bold
+        cleaned = re.sub(r"\*([^*]+)\*", r"\1", cleaned)      # *italic* -> italic
+        cleaned = re.sub(r"__([^_]+)__", r"\1", cleaned)      # __bold__ -> bold
+        cleaned = re.sub(r"_([^_]+)_", r"\1", cleaned)        # _italic_ -> italic
+        cleaned = re.sub(r"`([^`]+)`", r"\1", cleaned)        # `code` -> code
+        cleaned = re.sub(r"~~([^~]+)~~", r"\1", cleaned)      # ~~strikethrough~~ -> strikethrough
+        cleaned = re.sub(r"[*_~#`>]", "", cleaned)            # Stray asterisks, hashes, backticks
+        # Pronounce T.U.E.S.D.A.Y cleanly as "Tuesday"
+        cleaned = re.sub(r"\bT\.?U\.?E\.?S\.?D\.?A\.?Y\.?\b", "Tuesday", cleaned, flags=re.IGNORECASE)
         # Strip all emojis and symbols
         cleaned = re.sub(r'[\U00010000-\U0010ffff]', '', cleaned)
         cleaned = re.sub(r'[\u2600-\u27BF]', '', cleaned)

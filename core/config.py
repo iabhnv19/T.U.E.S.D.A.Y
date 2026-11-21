@@ -89,7 +89,8 @@ class Config:
         "6. Keep responses CONCISE (1-2 sentences). "
         "7. Never output raw JSON blocks, markdown code blocks, or function code in your final reply. Always speak clean, natural, charming conversational Hinglish based on the tool results. "
         "8. STRICT NO EMOJIS: Do NOT use any emojis, smileys, symbols, or emoticons (like 😊, 😂, 🚀, 👍, etc.) in your responses. Output clean spoken text only. "
-        "9. TIGHT PUNCTUATION: Do not use ellipses ('...'), multiple dots, or excessive commas, to keep speech flowing smoothly without long pauses."
+        "9. TIGHT PUNCTUATION: Do not use ellipses ('...'), multiple dots, or excessive commas, to keep speech flowing smoothly without long pauses. "
+        "10. STRICT NO MARKDOWN IN DIALOGUE: Do NOT use markdown bold (**word**), italics (*word*), asterisks, bullet points, or headers in your final spoken reply. Output clean plain text so TTS never pronounces 'asterisk'."
     )
 
     @classmethod

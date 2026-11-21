@@ -89,9 +89,44 @@ class Tuesday:
         print(f"\n  ✓ {greeting}")
         print(f"  ✓ Press [{Config.HOTKEY_MODIFIER} + {Config.HOTKEY_KEY}] for Active Mode\n")
 
-        self.overlay.show_status("ready", greeting, auto_hide_ms=2500)
-        self.voice.speak_async(greeting)
         self.scheduler.start()
+        # Launch initial startup briefing check in background thread
+        threading.Thread(target=self._run_startup_sequence, daemon=True).start()
+
+    def _run_startup_sequence(self):
+        """Initial run startup prompt: greets user as Sir and asks if they want a quick daily briefing."""
+        time.sleep(0.5)
+        startup_prompt = "Tuesday online. Would you like to begin your session with a quick briefing, Sir?"
+        print(f"  [{Config.NAME}] 🎙️ {startup_prompt}")
+        self.overlay.show_status("speaking", startup_prompt)
+        self.voice.speak(startup_prompt)
+
+        self.overlay.update_status("listening", "Listening for reply...")
+        user_answer = self.voice.listen(timeout=4.5)
+
+        if user_answer:
+            ans = user_answer.strip().lower()
+            print(f"  You: {ans}")
+            affirmative_words = ["yes", "haan", "sure", "briefing", "chalo", "kar do", "batao", "yeah", "yep", "ha", "bilkul", "start", "ok", "okay"]
+            if any(w in ans for w in affirmative_words):
+                self.overlay.update_status("thinking", "Preparing daily briefing...")
+                self.voice.speak("Preparing your briefing now, Sir.")
+                try:
+                    from modules.productivity_tools import get_daily_briefing
+                    briefing = get_daily_briefing()
+                    print(f"  [{Config.NAME}] Daily Briefing:\n{briefing}")
+                    self.overlay.update_status("speaking", "Delivering Daily Briefing...")
+                    self.voice.speak(briefing)
+                except Exception as e:
+                    print(f"  [ERROR] Daily briefing error: {e}")
+
+                self.overlay.show_status("sleeping", "Standing by", auto_hide_ms=2000)
+                self.voice.speak("Standing by, Sir. Press Right Shift + Enter whenever needed.")
+                return
+
+        # If user said no, or silence/timeout:
+        self.overlay.show_status("sleeping", "Standing by", auto_hide_ms=2000)
+        self.voice.speak("Standing by, Sir.")
 
     def _register_hotkey(self):
         """Global toggle hotkey (Right Shift + Enter)."""
