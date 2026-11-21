@@ -779,3 +779,20 @@ def update_fact(key: str, new_value: str) -> str:
 def search_memory(query: str, limit: int = 3) -> str:
     from core.memory import MemoryStore
     return MemoryStore().search_memory(query, limit=limit)
+
+
+@tool(
+    name="get_mood_summary",
+    description="Retrieve analytics on user's detected mood and sentiment over the past week.",
+    params_schema={
+        "type": "object",
+        "properties": {
+            "days": {"type": "integer", "description": "Number of days of history to analyze (default 7)."}
+        },
+        "required": []
+    },
+    risk="low"
+)
+def get_mood_summary(days: int = 7) -> str:
+    from core.mood import MoodEngine
+    return MoodEngine().get_mood_summary(days=days)

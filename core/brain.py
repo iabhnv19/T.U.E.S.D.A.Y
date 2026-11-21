@@ -115,6 +115,8 @@ class AIBrain:
         )
 
         self.memory = MemoryStore()
+        from core.mood import MoodEngine
+        self.mood_engine = MoodEngine(self.memory)
         self.available_models: List[str] = list(self.client.fallback_models)
         self.current_model_index: int = 0
         self.turn_count: int = 0
@@ -158,6 +160,11 @@ class AIBrain:
             r"^(?:bhai|yaar|tuesday|please|aur|mujhe batao|check kar|kuch|mere ko|batao|give me|tell me)\s+",
             re.IGNORECASE,
         )
+        self._mood_triggers = frozenset([
+            "how was my mood", "my mood this week", "mood history", "mood summary",
+            "mera mood kaisa tha", "mera mood kaisa raha", "mood kaisa hai mera", "track my mood",
+            "what was my mood", "mood analysis"
+        ])
 
     def _refresh_available_models(self):
         """Discover active chat models from the AI provider and arrange fallback chain."""
@@ -247,6 +254,9 @@ class AIBrain:
         user_lower = user_input.lower().strip()
         self.turn_count += 1
 
+        # Track mood and sentiment asynchronously or locally in SQLite
+        self.mood_engine.record_mood(user_input)
+
         def _send_fast_reply(text: str) -> str:
             if on_sentence:
                 on_sentence(text)
@@ -302,6 +312,12 @@ class AIBrain:
                 reply = "Abhi mere paas aapke baare mein koi specific facts save nahi hain, Sir."
             return _send_fast_reply(reply)
 
+        # Mood history / analytics: "how was my mood this week", "mera mood kaisa tha", etc.
+        if any(x in user_lower for x in self._mood_triggers):
+            summary = self.mood_engine.get_mood_summary(days=7)
+            reply = f"Sir, yahan aapka mood analysis hai: {summary}"
+            return _send_fast_reply(reply)
+
         # ── 3. Semantic Memory Retrieval from Past Conversations ──────────
         memory_snippet = ""
         if any(pt in user_lower for pt in self._past_triggers):
@@ -330,9 +346,10 @@ class AIBrain:
         current_enriched = f"[{timestamp}] {user_input}{memory_snippet}{web_context}"
 
         profile_snippet = self.memory.get_profile_summary()
+        mood_snippet = self.mood_engine.get_prompt_injection(user_input)
 
         messages: List[Dict[str, Any]] = [
-            {"role": "system", "content": Config.SYSTEM_PROMPT + profile_snippet}
+            {"role": "system", "content": Config.SYSTEM_PROMPT + profile_snippet + mood_snippet}
         ]
         messages.extend(self.conversation[-9:-1])
         messages.append({"role": "user", "content": current_enriched})

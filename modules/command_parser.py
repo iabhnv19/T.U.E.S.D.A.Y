@@ -107,7 +107,7 @@ ACTION_KEYWORDS = {
     # Hardware & Diagnostics
     "shutdown", "restart", "reboot", "lock", "ram", "cpu", "specs", "network", "ping", "ip", "battery",
     # Productivity
-    "reminder", "remind", "alarm", "timer", "todo", "task", "note", "routine", "briefing", "brief",
+    "reminder", "remind", "alarm", "timer", "todo", "task", "note", "routine", "briefing", "brief", "mood",
     "schedule", "email", "mail", "unread", "calendar",
     # Files & Storage
     "file", "folder", "directory", "files", "zip", "compress", "move", "rename", "delete",
@@ -285,12 +285,18 @@ class CommandParser:
             "save this link": ("save_browser_link", {}),
             "save link": ("save_browser_link", {}),
 
-            # Long-term Memory
+            # Long-term Memory & Mood
             "what do you know about me": ("recall_facts", {}),
             "who am i": ("recall_facts", {}),
             "mere baare mein kya janti ho": ("recall_facts", {}),
             "kya yaad hai mere baare mein": ("recall_facts", {}),
             "recall facts": ("recall_facts", {}),
+            "how was my mood this week": ("get_mood_summary", {"days": 7}),
+            "my mood this week": ("get_mood_summary", {"days": 7}),
+            "mood history": ("get_mood_summary", {"days": 7}),
+            "mood summary": ("get_mood_summary", {"days": 7}),
+            "mera mood kaisa tha": ("get_mood_summary", {"days": 7}),
+            "mera mood kaisa raha": ("get_mood_summary", {"days": 7}),
 
             # Phase 4 Screen & OCR
             "what's on my screen": ("analyze_screen", {}),
@@ -574,6 +580,12 @@ class CommandParser:
                 re.compile(r"(?:search memory for|search past conversations for)\s+(.+)", re.I),
                 "search_memory",
                 lambda m: {"query": m.group(1).strip()},
+            ),
+            # Mood patterns
+            (
+                re.compile(r"(?:how was my mood|mera mood kaisa tha|my mood in the last|mood in past)\s*(\d+)?\s*(?:days|din)?", re.I),
+                "get_mood_summary",
+                lambda m: {"days": int(m.group(1)) if m.group(1) else 7},
             ),
         ]
 

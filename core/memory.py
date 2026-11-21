@@ -13,7 +13,7 @@ import os
 import re
 import sqlite3
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -103,6 +103,15 @@ class MemoryStore:
                     content TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS mood_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    detected_mood TEXT NOT NULL,
+                    sentiment_score REAL DEFAULT 0.0,
+                    user_snippet TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             conn.commit()
@@ -532,4 +541,27 @@ class MemoryStore:
                 cur = conn.execute("DELETE FROM notes WHERE title LIKE ?", (f"%{identifier}%",))
             conn.commit()
             return cur.rowcount > 0
+
+    # ── Mood Tracking ────────────────────────────────────────────────────────
+
+    def log_mood(self, detected_mood: str, sentiment_score: float, user_snippet: str = "") -> int:
+        """Record detected user mood and sentiment score in SQLite."""
+        now = datetime.now().isoformat()
+        with self._get_connection() as conn:
+            cur = conn.execute(
+                "INSERT INTO mood_logs (detected_mood, sentiment_score, user_snippet, timestamp) VALUES (?, ?, ?, ?)",
+                (detected_mood, float(sentiment_score), user_snippet[:200], now)
+            )
+            conn.commit()
+            return cur.lastrowid
+
+    def get_mood_history(self, days: int = 7) -> List[Dict[str, Any]]:
+        """Fetch mood logs from the past N days."""
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT id, detected_mood, sentiment_score, user_snippet, timestamp FROM mood_logs WHERE timestamp >= ? ORDER BY id DESC",
+                (cutoff,)
+            ).fetchall()
+            return [dict(r) for r in rows]
 
