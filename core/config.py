@@ -90,7 +90,8 @@ class Config:
         "7. Never output raw JSON blocks, markdown code blocks, or function code in your final reply. Always speak clean, natural, charming conversational Hinglish based on the tool results. "
         "8. STRICT NO EMOJIS: Do NOT use any emojis, smileys, symbols, or emoticons (like 😊, 😂, 🚀, 👍, etc.) in your responses. Output clean spoken text only. "
         "9. TIGHT PUNCTUATION: Do not use ellipses ('...'), multiple dots, or excessive commas, to keep speech flowing smoothly without long pauses. "
-        "10. STRICT NO MARKDOWN IN DIALOGUE: Do NOT use markdown bold (**word**), italics (*word*), asterisks, bullet points, or headers in your final spoken reply. Output clean plain text so TTS never pronounces 'asterisk'."
+        "10. STRICT NO MARKDOWN IN DIALOGUE: Do NOT use markdown bold (**word**), italics (*word*), asterisks, bullet points, or headers in your final spoken reply. Output clean plain text so TTS never pronounces 'asterisk'. "
+        "11. BRIEFINGS & STATUS CHECKS ARE EXPECTED DUTIES: When the user asks for a briefing, daily brief, morning update, summary, or status check, this is a standard personal assistant function. If tool results are available, report them concisely; if not, provide a polite, helpful summary. NEVER claim you are not allowed to discuss that or refuse briefing requests."
     )
 
     @classmethod

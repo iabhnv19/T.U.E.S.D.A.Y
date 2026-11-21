@@ -373,8 +373,11 @@ def discover_and_register_tools():
                 print(f"[Tools] Could not load tool module {py_file.name}: {e}")
 
 
-# ── Auto-discover on module load ──────────────────────────────────────────
+# ── Auto-discover on module load (guarded to run only once) ───────────────
+_tools_discovered = False
 try:
-    discover_and_register_tools()
+    if not _tools_discovered:
+        discover_and_register_tools()
+        _tools_discovered = True
 except Exception:
     pass

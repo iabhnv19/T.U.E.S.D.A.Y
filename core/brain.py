@@ -15,6 +15,50 @@ from core.tools import (
 from modules.web_search import perform_live_web_search
 
 
+# ── Pre-compiled regex patterns for text cleaning (shared across all cleaners) ──
+_RE_CODE_BLOCK = re.compile(r"```(?:json)?\s*[\s\S]*?```")
+_RE_ACTION_JSON = re.compile(r'\{[^{}]*"action"[^{}]*\}')
+_RE_BOLD = re.compile(r"\*\*([^*]+)\*\*")
+_RE_ITALIC = re.compile(r"\*([^*]+)\*")
+_RE_DBOLD = re.compile(r"__([^_]+)__")
+_RE_DITALIC = re.compile(r"_([^_]+)_")
+_RE_INLINE_CODE = re.compile(r"`([^`]+)`")
+_RE_STRIKE = re.compile(r"~~([^~]+)~~")
+_RE_STRAY_MD = re.compile(r"[*_~#`>]")
+_RE_TUESDAY_DOTS = re.compile(r"\bT\.?U\.?E\.?S\.?D\.?A\.?Y\.?\b", re.IGNORECASE)
+_RE_EMOJI_SUPP = re.compile(r'[\U00010000-\U0010ffff]')
+_RE_EMOJI_MISC = re.compile(r'[\u2600-\u27BF]')
+_RE_EMOJI_SURR = re.compile(r'[\uD83C-\uDBFF\uDC00-\uDFFF]')
+_RE_MULTI_DOT = re.compile(r'\.{2,}')
+_RE_MULTI_DASH = re.compile(r'--+')
+_RE_MULTI_COMMA = re.compile(r'[,;]{2,}')
+
+
+def _clean_text_for_speech(text: str) -> str:
+    """Shared fast text cleaner used by SentenceChunker, AIBrain, and VoiceEngine."""
+    if not text:
+        return ""
+    c = text
+    c = _RE_CODE_BLOCK.sub("", c)
+    c = _RE_ACTION_JSON.sub("", c)
+    c = c.replace("```json", "").replace("```", "")
+    c = _RE_BOLD.sub(r"\1", c)
+    c = _RE_ITALIC.sub(r"\1", c)
+    c = _RE_DBOLD.sub(r"\1", c)
+    c = _RE_DITALIC.sub(r"\1", c)
+    c = _RE_INLINE_CODE.sub(r"\1", c)
+    c = _RE_STRIKE.sub(r"\1", c)
+    c = _RE_STRAY_MD.sub("", c)
+    c = _RE_TUESDAY_DOTS.sub("Tuesday", c)
+    c = _RE_EMOJI_SUPP.sub("", c)
+    c = _RE_EMOJI_MISC.sub("", c)
+    c = _RE_EMOJI_SURR.sub("", c)
+    c = _RE_MULTI_DOT.sub(".", c)
+    c = _RE_MULTI_DASH.sub("-", c)
+    c = _RE_MULTI_COMMA.sub(",", c)
+    return c.strip()
+
+
 class SentenceChunker:
     """Buffers streaming text and yields clean, complete sentence clauses for real-time TTS."""
 
@@ -55,32 +99,7 @@ class SentenceChunker:
 
     @staticmethod
     def _clean(text: str) -> str:
-        if not text:
-            return ""
-        c = text
-        # Strip markdown code blocks & JSON
-        c = re.sub(r"```(?:json)?\s*[\s\S]*?```", "", c)
-        c = re.sub(r'\{[^{}]*"action"[^{}]*\}', "", c)
-        c = c.replace("```json", "").replace("```", "")
-        # Strip markdown bold, italics, inline code, headers, bullets, strikethrough
-        c = re.sub(r"\*\*([^*]+)\*\*", r"\1", c)  # **bold** -> bold
-        c = re.sub(r"\*([^*]+)\*", r"\1", c)      # *italic* -> italic
-        c = re.sub(r"__([^_]+)__", r"\1", c)      # __bold__ -> bold
-        c = re.sub(r"_([^_]+)_", r"\1", c)        # _italic_ -> italic
-        c = re.sub(r"`([^`]+)`", r"\1", c)        # `code` -> code
-        c = re.sub(r"~~([^~]+)~~", r"\1", c)      # ~~strikethrough~~ -> strikethrough
-        c = re.sub(r"[*_~#`>]", "", c)            # Stray asterisks, hashes, backticks
-        # Pronounce T.U.E.S.D.A.Y cleanly as "Tuesday"
-        c = re.sub(r"\bT\.?U\.?E\.?S\.?D\.?A\.?Y\.?\b", "Tuesday", c, flags=re.IGNORECASE)
-        # Strip all emojis, pictographs, symbols
-        c = re.sub(r'[\U00010000-\U0010ffff]', '', c)
-        c = re.sub(r'[\u2600-\u27BF]', '', c)
-        c = re.sub(r'[\uD83C-\uDBFF\uDC00-\uDFFF]', '', c)
-        # Compress ellipses and repetitive punctuation to prevent long speech pauses
-        c = re.sub(r'\.{2,}', '.', c)
-        c = re.sub(r'--+', '-', c)
-        c = re.sub(r'[,;]{2,}', ',', c)
-        return c.strip()
+        return _clean_text_for_speech(text)
 
 
 class AIBrain:
@@ -106,6 +125,39 @@ class AIBrain:
         # Initialize tools registry and refresh models
         discover_and_register_tools()
         self._refresh_available_models()
+
+        # Pre-cache tool schemas so they aren't rebuilt on every request
+        self._cached_tool_schemas: Optional[List[Dict[str, Any]]] = None
+        self._tools_dirty: bool = True
+
+        # Pre-compile regex patterns used in hot paths
+        self._re_remember = re.compile(
+            r"(?:please\s+)?(?:remember\s+(?:that\s+)?|yaad\s+rakhna\s+(?:ki\s+)?)\s*(.+)",
+            re.IGNORECASE,
+        )
+        self._re_forget = re.compile(
+            r"(?:please\s+)?(?:forget\s+(?:that\s+)?|bhool\s+jao\s+(?:ki\s+)?)\s*(.+)",
+            re.IGNORECASE,
+        )
+        self._recall_phrases = frozenset([
+            "what do you know about me", "who am i", "mera naam kya hai",
+            "mere baare mein kya janti ho", "kya yaad hai mere baare mein", "what do you remember"
+        ])
+        self._past_triggers = frozenset([
+            "what did i say", "what did we talk", "earlier you said", "pichli baar",
+            "humne kya baat ki thi", "maine pehle kya bola", "did i mention"
+        ])
+        self._search_triggers = frozenset([
+            "release date", "release", "kab aayegi", "kab release", "earnings", "box office",
+            "who is", "what is the score", "latest", "price", "trailer",
+            "avengers", "doomsday", "movie", "film",
+            "news", "khabar", "samachar", "breaking", "headline", "taza", "tapti", "tadapti",
+            "score", "match", "ipl", "result", "kitne ka", "cost"
+        ])
+        self._re_search_prefix = re.compile(
+            r"^(?:bhai|yaar|tuesday|please|aur|mujhe batao|check kar|kuch|mere ko|batao|give me|tell me)\s+",
+            re.IGNORECASE,
+        )
 
     def _refresh_available_models(self):
         """Discover active chat models from the AI provider and arrange fallback chain."""
@@ -162,6 +214,13 @@ class AIBrain:
             return next_model
         return None
 
+    def _get_tool_schemas(self) -> Optional[List[Dict[str, Any]]]:
+        """Return cached tool schemas, rebuilding only when dirty."""
+        if self._tools_dirty or self._cached_tool_schemas is None:
+            self._cached_tool_schemas = get_tool_schemas()
+            self._tools_dirty = False
+        return self._cached_tool_schemas
+
     def think(
         self,
         user_input: str,
@@ -216,11 +275,7 @@ class AIBrain:
 
         # ── 2. Explicit Memory Commands ───────────────────────────────────
         # Remember fact: "remember that ...", "yaad rakhna ki ..."
-        remember_match = re.search(
-            r"(?:please\s+)?(?:remember\s+(?:that\s+)?|yaad\s+rakhna\s+(?:ki\s+)?)\s*(.+)",
-            user_input,
-            re.IGNORECASE,
-        )
+        remember_match = self._re_remember.search(user_input)
         if remember_match:
             fact = remember_match.group(1).strip()
             if fact:
@@ -229,11 +284,7 @@ class AIBrain:
                 return _send_fast_reply(reply)
 
         # Forget fact: "forget that ...", "bhool jao ki ..."
-        forget_match = re.search(
-            r"(?:please\s+)?(?:forget\s+(?:that\s+)?|bhool\s+jao\s+(?:ki\s+)?)\s*(.+)",
-            user_input,
-            re.IGNORECASE,
-        )
+        forget_match = self._re_forget.search(user_input)
         if forget_match:
             fact = forget_match.group(1).strip()
             if fact:
@@ -242,10 +293,7 @@ class AIBrain:
                 return _send_fast_reply(reply)
 
         # Recall profile / facts: "who am i", "what do you know about me", etc.
-        if any(x in user_lower for x in [
-            "what do you know about me", "who am i", "mera naam kya hai",
-            "mere baare mein kya janti ho", "kya yaad hai mere baare mein", "what do you remember"
-        ]):
+        if any(x in user_lower for x in self._recall_phrases):
             facts = self.memory.recall_facts()
             if facts:
                 facts_text = "; ".join([f"{f['key']}: {f['value']}" for f in facts[:8]])
@@ -256,30 +304,15 @@ class AIBrain:
 
         # ── 3. Semantic Memory Retrieval from Past Conversations ──────────
         memory_snippet = ""
-        past_triggers = [
-            "what did i say", "what did we talk", "earlier you said", "pichli baar",
-            "humne kya baat ki thi", "maine pehle kya bola", "did i mention"
-        ]
-        if any(pt in user_lower for pt in past_triggers):
+        if any(pt in user_lower for pt in self._past_triggers):
             past_results = self.memory.search_memory(user_input, limit=2)
             if "Relevant past dialogue" in past_results or "Past dialogue" in past_results:
                 memory_snippet = f"\n[RETRIEVED PAST CONVERSATION MEMORY]:\n{past_results}\n"
 
         # ── 4. Single-Turn Live Facts Injection ───────────────────────────
         web_context = ""
-        search_triggers = [
-            "release date", "release", "kab aayegi", "kab release", "earnings", "box office",
-            "who is", "what is the score", "latest", "price", "trailer",
-            "avengers", "doomsday", "movie", "film",
-            "news", "khabar", "samachar", "breaking", "headline", "taza", "tapti", "tadapti",
-            "score", "match", "ipl", "result", "kitne ka", "cost"
-        ]
-        if any(k in user_lower for k in search_triggers):
-            clean_search_query = re.sub(
-                r"^(?:bhai|yaar|tuesday|please|aur|mujhe batao|check kar|kuch|mere ko|batao|give me|tell me)\s+",
-                "",
-                user_lower,
-            ).strip()
+        if any(k in user_lower for k in self._search_triggers):
+            clean_search_query = self._re_search_prefix.sub("", user_lower).strip()
             if clean_search_query:
                 if on_status:
                     on_status(f"Searching web for '{clean_search_query[:30]}'...")
@@ -309,7 +342,7 @@ class AIBrain:
         from modules.command_parser import has_action_intent
         needs_tools = has_action_intent(user_input) or bool(ConfirmationManager.get_pending())
 
-        tools_schema = get_tool_schemas() if needs_tools else None
+        tools_schema = self._get_tool_schemas() if needs_tools else None
         max_hops = 6
         hop = 0
         final_reply = ""
@@ -433,39 +466,15 @@ class AIBrain:
         return self._call_llm_with_fallback(messages, tools)
 
     def _record_dialogue(self, user_text: str, reply_text: str):
-        """Append turn to SQLite database, ChromaDB vector index, and active context."""
+        """Persist turn to SQLite database and ChromaDB vector index.
+        Note: conversation list is managed inside think() to avoid double-append."""
         self.memory.add_turn("user", user_text)
         self.memory.add_turn("assistant", reply_text)
-        self.conversation.append({"role": "user", "content": user_text})
         self.conversation.append({"role": "assistant", "content": reply_text})
 
     def clean_response(self, response: str) -> str:
         """Strip raw action code blocks, JSON markdown, asterisks, and emojis so TTS speaks clean dialogue."""
-        if not response:
-            return ""
-        cleaned = response
-        cleaned = re.sub(r"```(?:json)?\s*[\s\S]*?```", "", cleaned)
-        cleaned = re.sub(r'\{[^{}]*"action"[^{}]*\}', "", cleaned)
-        cleaned = cleaned.replace("```json", "").replace("```", "")
-        # Strip markdown bold, italics, inline code, headers, bullets, strikethrough
-        cleaned = re.sub(r"\*\*([^*]+)\*\*", r"\1", cleaned)  # **bold** -> bold
-        cleaned = re.sub(r"\*([^*]+)\*", r"\1", cleaned)      # *italic* -> italic
-        cleaned = re.sub(r"__([^_]+)__", r"\1", cleaned)      # __bold__ -> bold
-        cleaned = re.sub(r"_([^_]+)_", r"\1", cleaned)        # _italic_ -> italic
-        cleaned = re.sub(r"`([^`]+)`", r"\1", cleaned)        # `code` -> code
-        cleaned = re.sub(r"~~([^~]+)~~", r"\1", cleaned)      # ~~strikethrough~~ -> strikethrough
-        cleaned = re.sub(r"[*_~#`>]", "", cleaned)            # Stray asterisks, hashes, backticks
-        # Pronounce T.U.E.S.D.A.Y cleanly as "Tuesday"
-        cleaned = re.sub(r"\bT\.?U\.?E\.?S\.?D\.?A\.?Y\.?\b", "Tuesday", cleaned, flags=re.IGNORECASE)
-        # Strip all emojis and symbols
-        cleaned = re.sub(r'[\U00010000-\U0010ffff]', '', cleaned)
-        cleaned = re.sub(r'[\u2600-\u27BF]', '', cleaned)
-        cleaned = re.sub(r'[\uD83C-\uDBFF\uDC00-\uDFFF]', '', cleaned)
-        # Compress excessive punctuation to eliminate speech pauses
-        cleaned = re.sub(r'\.{2,}', '.', cleaned)
-        cleaned = re.sub(r'--+', '-', cleaned)
-        cleaned = re.sub(r'[,;]{2,}', ',', cleaned)
-        return cleaned.strip()
+        return _clean_text_for_speech(response)
 
     def extract_action(self, response: str) -> Optional[dict]:
         """Legacy helper for backward-compatibility if needed."""

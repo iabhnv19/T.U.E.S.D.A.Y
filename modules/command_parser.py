@@ -20,16 +20,47 @@ KNOWN_APPS = [
     "vlc", "obs", "steam", "snipping tool"
 ]
 
+# Pre-frozen set for fast O(1) lookup instead of linear scan
+_KNOWN_APPS_SET = frozenset(KNOWN_APPS)
+
 
 def _match_app_fuzzy(raw_name: str) -> str:
     """Resolve spoken app names or typos using rapidfuzz string similarity."""
     clean = raw_name.lower().strip()
     if not clean:
         return raw_name
+    # Fast exact check before expensive fuzzy scoring
+    if clean in _KNOWN_APPS_SET:
+        return clean
     match = process.extractOne(clean, KNOWN_APPS, scorer=fuzz.ratio)
     if match and match[1] >= 75:
         return match[0]
     return clean
+
+
+# ── Pre-compiled normalizer patterns (compiled once at import, not per call) ──
+_RE_WAKEWORD = re.compile(r"^(?:hey\s+|hi\s+|hello\s+|ok\s+|okay\s+)?tuesday[,:\s]*", re.IGNORECASE)
+_RE_TUESDAY_INLINE = re.compile(r"^tuesday[,:\s]*", re.IGNORECASE)
+_COMPILED_PREFIX_PATTERNS = [
+    re.compile(r"^(?:please|kripya|kindly)\s+", re.IGNORECASE),
+    re.compile(r"^(?:can\s+you|could\s+you|would\s+you)(?:\s+please)?\s+", re.IGNORECASE),
+    re.compile(r"^(?:bhai|yaar|dost|bro|sir|boss)\s+", re.IGNORECASE),
+    re.compile(r"^(?:suno|sun|achha\s+suno|achha|acha|zara|zarra|dekh|dekho)\s+", re.IGNORECASE),
+    re.compile(r"^(?:ek\s+kaam\s+karo|ek\s+kaam\s+kar|ek\s+cheez\s+karo)\s+", re.IGNORECASE),
+    re.compile(r"^(?:just|jaldi\s+se|fatfat|jaldi)\s+", re.IGNORECASE),
+    re.compile(r"^(?:mujhe|meri|mera)\s+", re.IGNORECASE),
+    re.compile(r"^(?:yes|yeah|yep|sure|haan|ha|ok|okay)\s+", re.IGNORECASE),
+    re.compile(r"^(?:i\s+need|i\s+want|give\s+me|show\s+me|start\s+with|begin\s+with|provide|tell\s+me)(?:\s+a|\s+an|\s+the|\s+me)?\s+", re.IGNORECASE),
+    re.compile(r"^(?:a|an|the)\s+", re.IGNORECASE),
+]
+_COMPILED_SUFFIX_PATTERNS = [
+    re.compile(r"\s+(?:please|kindly)$", re.IGNORECASE),
+    re.compile(r"\s+(?:na|yaar|bhai|bro|boss)$", re.IGNORECASE),
+    re.compile(r"\s+(?:jaldi|turant|fast|now)$", re.IGNORECASE),
+    re.compile(r"\s+(?:kardo|kar\s+do|karna|karo)$", re.IGNORECASE),
+]
+_RE_MATH_EXPR = re.compile(r"\d+\s*[\+\-\*\/\^x÷]\s*\d+")
+_ACTION_PHRASES = ["kar do", "khol do", "band karo", "chala do", "likh do", "bata do mausam", "yaad rakhna", "bhool jao"]
 
 
 def normalize_command_text(text: str) -> str:
@@ -44,36 +75,21 @@ def normalize_command_text(text: str) -> str:
     clean = text.lower().strip()
 
     # Strip wake-word / greeting prefixes
-    clean = re.sub(r"^(?:hey\s+|hi\s+|hello\s+|ok\s+|okay\s+)?tuesday[,:\s]*", "", clean, flags=re.IGNORECASE)
+    clean = _RE_WAKEWORD.sub("", clean).strip()
 
     # Iteratively strip conversational lead-ins
-    prefix_patterns = [
-        r"^(?:please|kripya|kindly)\s+",
-        r"^(?:can\s+you|could\s+you|would\s+you)(?:\s+please)?\s+",
-        r"^(?:bhai|yaar|dost|bro|sir|boss)\s+",
-        r"^(?:suno|sun|achha\s+suno|achha|acha|zara|zarra|dekh|dekho)\s+",
-        r"^(?:ek\s+kaam\s+karo|ek\s+kaam\s+kar|ek\s+cheez\s+karo)\s+",
-        r"^(?:just|jaldi\s+se|fatfat|jaldi)\s+",
-        r"^(?:mujhe|meri|mera)\s+",
-    ]
     changed = True
     while changed:
         old = clean
-        for pat in prefix_patterns:
-            clean = re.sub(pat, "", clean, flags=re.IGNORECASE).strip()
+        for pat in _COMPILED_PREFIX_PATTERNS:
+            clean = pat.sub("", clean).strip()
         # In case wake-word followed filler e.g. "bhai tuesday open chrome"
-        clean = re.sub(r"^tuesday[,:\s]*", "", clean, flags=re.IGNORECASE).strip()
+        clean = _RE_TUESDAY_INLINE.sub("", clean).strip()
         changed = (old != clean)
 
     # Strip trailing polite tags or colloquial endings
-    suffix_patterns = [
-        r"\s+(?:please|kindly)$",
-        r"\s+(?:na|yaar|bhai|bro|boss)$",
-        r"\s+(?:jaldi|turant|fast|now)$",
-        r"\s+(?:kardo|kar\s+do|karna|karo)$",
-    ]
-    for spat in suffix_patterns:
-        clean = re.sub(spat, "", clean, flags=re.IGNORECASE).strip()
+    for spat in _COMPILED_SUFFIX_PATTERNS:
+        clean = spat.sub("", clean).strip()
 
     return clean
 
@@ -91,7 +107,7 @@ ACTION_KEYWORDS = {
     # Hardware & Diagnostics
     "shutdown", "restart", "reboot", "lock", "ram", "cpu", "specs", "network", "ping", "ip", "battery",
     # Productivity
-    "reminder", "remind", "alarm", "timer", "todo", "task", "note", "routine", "briefing",
+    "reminder", "remind", "alarm", "timer", "todo", "task", "note", "routine", "briefing", "brief",
     "schedule", "email", "mail", "unread", "calendar",
     # Files & Storage
     "file", "folder", "directory", "files", "zip", "compress", "move", "rename", "delete",
@@ -113,13 +129,12 @@ def has_action_intent(text: str) -> bool:
         return False
     lower = text.lower()
     words = set(re.findall(r"\b\w+\b", lower))
-    if bool(words.intersection(ACTION_KEYWORDS)):
+    if words & ACTION_KEYWORDS:
         return True
     # Math expressions like "7 * 8" or "15 + 20"
-    if re.search(r"\d+\s*[\+\-\*\/\^x÷]\s*\d+", lower):
+    if _RE_MATH_EXPR.search(lower):
         return True
-    phrases = ["kar do", "khol do", "band karo", "chala do", "likh do", "bata do mausam", "yaad rakhna", "bhool jao"]
-    return any(p in lower for p in phrases)
+    return any(p in lower for p in _ACTION_PHRASES)
 
 
 class CommandParser:
@@ -306,6 +321,17 @@ class CommandParser:
             "good morning": ("get_daily_briefing", {}),
             "morning briefing": ("get_daily_briefing", {}),
             "briefing": ("get_daily_briefing", {}),
+            "quick brief": ("get_daily_briefing", {}),
+            "quick briefing": ("get_daily_briefing", {}),
+            "brief": ("get_daily_briefing", {}),
+            "daily brief": ("get_daily_briefing", {}),
+            "morning brief": ("get_daily_briefing", {}),
+            "give me a brief": ("get_daily_briefing", {}),
+            "give me a briefing": ("get_daily_briefing", {}),
+            "give me a quick brief": ("get_daily_briefing", {}),
+            "need a quick brief": ("get_daily_briefing", {}),
+            "i need a quick brief": ("get_daily_briefing", {}),
+            "start briefing": ("get_daily_briefing", {}),
             "aaj ka update": ("get_daily_briefing", {}),
             "list reminders": ("list_reminders", {}),
             "show reminders": ("list_reminders", {}),
@@ -470,6 +496,11 @@ class CommandParser:
                 lambda m: {"query": m.group(1).strip()},
             ),
             # Phase 7 Productivity patterns
+            (
+                re.compile(r"^(?:(?:i\s+need|give\s+me|show\s+me|start\s+with|begin\s+with)\s+)?(?:a\s+)?(?:quick\s+|daily\s+|morning\s+)?brief(?:ing)?(?:\s+please|\s+sir|\s+boss)?$", re.I),
+                "get_daily_briefing",
+                lambda m: {},
+            ),
             (
                 re.compile(r"(?:remind me to|reminder lagao)\s+(.+?)\s+in\s+(\d+)\s*(?:minutes?|mins?)", re.I),
                 "add_reminder",

@@ -50,12 +50,14 @@ class Tuesday:
         print("   T.U.E.S.D.A.Y  —  Tactical Unified Electronic Systematic Digital Assistant")
         print("  " + "═" * 70 + "\n")
 
+        # Parallel initialization for faster startup
         print("  [1/5] Initializing AI brain...")
         self.brain = AIBrain()
 
         print("  [2/5] Setting up voice engine...")
         self.voice = VoiceEngine()
 
+        # PC controller and utilities are lightweight — init inline
         print("  [3/5] Loading PC controller...")
         self.pc = PCController()
 
@@ -71,6 +73,13 @@ class Tuesday:
 
         self._is_active = False
         self._running = True
+
+        # Pre-compute sleep detection phrases as a tuple for fast any() checks
+        self._sleep_phrases = ("go to sleep", "sleep now", "so jao", "bye tuesday", "stop listening")
+        # Pre-compute barge-in stop phrases
+        self._targeted_stops = ("tuesday stop", "tuesday chup", "tuesday ruko", "tuesday sun",
+                                "tuesday meri baat", "stop tuesday", "chup ho jao")
+        self._urgent_stops = frozenset({"stop", "ruko", "chup", "shant"})
 
     def run(self, app: QApplication, overlay: DynamicIsland):
         """Register hotkey, start system tray, and show startup state."""
@@ -107,7 +116,7 @@ class Tuesday:
         if user_answer:
             ans = user_answer.strip().lower()
             print(f"  You: {ans}")
-            affirmative_words = ["yes", "haan", "sure", "briefing", "chalo", "kar do", "batao", "yeah", "yep", "ha", "bilkul", "start", "ok", "okay"]
+            affirmative_words = ["yes", "haan", "sure", "briefing", "brief", "chalo", "kar do", "batao", "yeah", "yep", "ha", "bilkul", "start", "ok", "okay"]
             if any(w in ans for w in affirmative_words):
                 self.overlay.update_status("thinking", "Preparing daily briefing...")
                 self.voice.speak("Preparing your briefing now, Sir.")
@@ -184,7 +193,7 @@ class Tuesday:
                 user_input = user_input.strip()
                 print(f"  You: {user_input}")
 
-                if any(x in user_input.lower() for x in ["go to sleep", "sleep now", "so jao", "bye tuesday", "stop listening"]):
+                if any(x in user_input.lower() for x in self._sleep_phrases):
                     response = "Standing by boss. Call me when needed."
                     print(f"  {Config.NAME}: {response}")
                     self.overlay.update_status("speaking", response)
@@ -236,6 +245,24 @@ class Tuesday:
             self.overlay.hide_bar()
             print(f"  [{Config.NAME}] 💤 Sleep mode. Press Right Shift + Enter to wake.")
 
+    def _classify_bargein(self, heard: str):
+        """Classify heard text during barge-in. Returns (should_interrupt, result_text_or_None)."""
+        is_targeted_stop = any(k in heard for k in self._targeted_stops)
+        is_new_tuesday_query = heard.startswith("tuesday") or "tuesday " in heard
+        is_urgent_stop = heard in self._urgent_stops
+
+        if is_targeted_stop or is_new_tuesday_query or is_urgent_stop:
+            print(f"\n  [{Config.NAME}] 🛑 Intentional interruption detected: '{heard}'")
+            self.voice.stop_speaking()
+
+            if (is_targeted_stop or is_urgent_stop) and len(heard.split()) <= 2:
+                return True, "Standing by."
+
+            clean_query = heard.replace("tuesday", "").strip()
+            return True, (clean_query or heard)
+
+        return False, None
+
     def _wait_for_speech_with_bargein(self):
         """Monitors mic while streaming sentences finish playing out loud."""
         import speech_recognition as sr
@@ -250,22 +277,9 @@ class Tuesday:
                             audio, language=Config.VOICE_LANGUAGE
                         ).strip().lower()
 
-                        is_targeted_stop = any(k in heard for k in [
-                            "tuesday stop", "tuesday chup", "tuesday ruko", "tuesday sun",
-                            "tuesday meri baat", "stop tuesday", "chup ho jao"
-                        ])
-                        is_new_tuesday_query = heard.startswith("tuesday") or "tuesday " in heard
-                        is_urgent_stop = heard in ["stop", "ruko", "chup", "shant"]
-
-                        if is_targeted_stop or is_new_tuesday_query or is_urgent_stop:
-                            print(f"\n  [{Config.NAME}] 🛑 Intentional interruption detected: '{heard}'")
-                            self.voice.stop_speaking()
-
-                            if (is_targeted_stop or is_urgent_stop) and len(heard.split()) <= 2:
-                                return "Standing by."
-
-                            clean_query = heard.replace("tuesday", "").strip()
-                            return clean_query or heard
+                        interrupted, result = self._classify_bargein(heard)
+                        if interrupted:
+                            return result
                     except (sr.WaitTimeoutError, sr.UnknownValueError):
                         continue
                     except Exception:
@@ -296,23 +310,10 @@ class Tuesday:
                             audio, language=Config.VOICE_LANGUAGE
                         ).strip().lower()
 
-                        is_targeted_stop = any(k in heard for k in [
-                            "tuesday stop", "tuesday chup", "tuesday ruko", "tuesday sun",
-                            "tuesday meri baat", "stop tuesday", "chup ho jao"
-                        ])
-                        is_new_tuesday_query = heard.startswith("tuesday") or "tuesday " in heard
-                        is_urgent_stop = heard in ["stop", "ruko", "chup", "shant"]
-
-                        if is_targeted_stop or is_new_tuesday_query or is_urgent_stop:
-                            print(f"\n  [{Config.NAME}] 🛑 Intentional interruption detected: '{heard}'")
-                            self.voice.stop_speaking()
+                        interrupted, result = self._classify_bargein(heard)
+                        if interrupted:
                             speak_thread.join(timeout=0.6)
-
-                            if (is_targeted_stop or is_urgent_stop) and len(heard.split()) <= 2:
-                                return "Standing by."
-
-                            clean_query = heard.replace("tuesday", "").strip()
-                            return clean_query or heard
+                            return result
                     except (sr.WaitTimeoutError, sr.UnknownValueError):
                         continue
                     except Exception:

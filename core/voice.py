@@ -28,6 +28,14 @@ class VoiceEngine:
             except Exception:
                 self._pygame_ready = False
 
+        # Reusable pygame clock for playback polling
+        self._pg_clock = None
+        if self._pygame_ready:
+            try:
+                self._pg_clock = pygame.time.Clock()
+            except Exception:
+                pass
+
         self.offline_engine = pyttsx3.init()
         self._setup_fallback_voice()
 
@@ -42,6 +50,22 @@ class VoiceEngine:
         self._is_listening = False
         self._stop_speaking_flag = False
         self._calibrated = False
+
+        # Pre-computed frozen set for Hinglish detection
+        self._hinglish_markers = frozenset({
+            "karo", "kardo", "karna", "nahi", "nahin", "hain", "hai", "kya", "bhai",
+            "raha", "rahe", "khol", "kholo", "chalao", "band", "batao", "kaise", "thik",
+            "acha", "achha", "shukriya", "dost", "kehti", "hota", "hoti", "aur", "toh",
+            "mein", "yeh", "woh", "yaar"
+        })
+
+        # Persistent asyncio event loop for edge-tts (avoids creating one per call)
+        self._tts_loop = None
+        try:
+            import asyncio
+            self._tts_loop = asyncio.new_event_loop()
+        except Exception:
+            pass
 
         # Streaming TTS sentence queue
         self._sentence_queue: queue.Queue = queue.Queue()
@@ -74,14 +98,8 @@ class VoiceEngine:
         """Heuristic check for Devanagari script or common Hinglish words."""
         if re.search(r"[\u0900-\u097F]", text):
             return True
-        hinglish_markers = {
-            "karo", "kardo", "karna", "nahi", "nahin", "hain", "hai", "kya", "bhai",
-            "raha", "rahe", "khol", "kholo", "chalao", "band", "batao", "kaise", "thik",
-            "acha", "achha", "shukriya", "dost", "kehti", "hota", "hoti", "aur", "toh",
-            "mein", "yeh", "woh", "yaar"
-        }
         words = set(re.findall(r"\w+", text.lower()))
-        return bool(words.intersection(hinglish_markers))
+        return bool(words & self._hinglish_markers)
 
     def stop_speaking(self):
         """Stops audio output immediately when barge-in is triggered."""
@@ -115,7 +133,6 @@ class VoiceEngine:
 
         # 1. Edge-TTS High-Definition Neural Voice (Fastest & Most Natural)
         try:
-            import asyncio
             import edge_tts
             voice = Config.EDGE_VOICE_HI if self._has_hindi_or_hinglish(clean) else Config.EDGE_VOICE_EN
 
@@ -123,7 +140,11 @@ class VoiceEngine:
                 comm = edge_tts.Communicate(clean, voice, rate="+12%")
                 await comm.save(output_path)
 
-            asyncio.run(_run())
+            if self._tts_loop:
+                self._tts_loop.run_until_complete(_run())
+            else:
+                import asyncio
+                asyncio.run(_run())
             if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
                 return True
         except Exception:
@@ -146,30 +167,8 @@ class VoiceEngine:
     @staticmethod
     def _clean_for_tts(text: str) -> str:
         """Strip markdown markers, asterisks, and pronounce acronyms properly for TTS."""
-        if not text:
-            return ""
-        c = text
-        # Strip code blocks
-        c = re.sub(r"```[\s\S]*?```", "", c)
-        # Strip markdown bold, italics, inline code, headers, bullets, strikethrough
-        c = re.sub(r"\*\*([^*]+)\*\*", r"\1", c)  # **text** -> text
-        c = re.sub(r"\*([^*]+)\*", r"\1", c)      # *text* -> text
-        c = re.sub(r"__([^_]+)__", r"\1", c)
-        c = re.sub(r"_([^_]+)_", r"\1", c)
-        c = re.sub(r"`([^`]+)`", r"\1", c)
-        c = re.sub(r"~~([^~]+)~~", r"\1", c)
-        c = re.sub(r"[*_~#`>]", "", c)            # Stray asterisks or markdown symbols
-        # Pronounce T.U.E.S.D.A.Y cleanly as "Tuesday"
-        c = re.sub(r"\bT\.?U\.?E\.?S\.?D\.?A\.?Y\.?\b", "Tuesday", c, flags=re.IGNORECASE)
-        # Remove emojis
-        c = re.sub(r'[\U00010000-\U0010ffff]', '', c)
-        c = re.sub(r'[\u2600-\u27BF]', '', c)
-        c = re.sub(r'[\uD83C-\uDBFF\uDC00-\uDFFF]', '', c)
-        # Compress excessive dots / commas
-        c = re.sub(r'\.{2,}', '.', c)
-        c = re.sub(r'--+', '-', c)
-        c = re.sub(r'[,;]{2,}', ',', c)
-        return c.strip()
+        from core.brain import _clean_text_for_speech
+        return _clean_text_for_speech(text)
 
     def _speak_phrase(self, text: str):
         """Speak a single phrase/sentence synchronously."""
@@ -196,7 +195,10 @@ class VoiceEngine:
                         if self._stop_speaking_flag:
                             pygame.mixer.music.stop()
                             break
-                        pygame.time.Clock().tick(50)
+                        if self._pg_clock:
+                            self._pg_clock.tick(50)
+                        else:
+                            pygame.time.Clock().tick(50)
                     pygame.mixer.music.unload()
                     return
             except Exception:

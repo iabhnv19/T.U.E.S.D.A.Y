@@ -61,6 +61,11 @@ def test_command_parser_conversational_wrappers():
     assert res is not None
     assert "Python GC" in res
 
+    # Conversational daily briefing
+    res = parser.try_parse("yes I need a quick brief")
+    assert res is not None
+    assert "briefing" in res.lower()
+
     # Pure conversational query returns None (routes to AI chatbot)
     res = parser.try_parse("who is Tony Stark?")
     assert res is None
