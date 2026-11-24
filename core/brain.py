@@ -117,6 +117,8 @@ class AIBrain:
         self.memory = MemoryStore()
         from core.mood import MoodEngine
         self.mood_engine = MoodEngine(self.memory)
+        from core.planner import ReActPlanner
+        self.planner = ReActPlanner(client=self.client, brain=self, memory=self.memory)
         self.available_models: List[str] = list(self.client.fallback_models)
         self.current_model_index: int = 0
         self.turn_count: int = 0
@@ -337,6 +339,30 @@ class AIBrain:
                 if search_data:
                     web_context = f"\n[LIVE FACTS]:\n{search_data[:1000]}\nUse these live facts to answer accurately."
 
+        # ── 5. Autonomous ReAct Planner for Multi-Step Goals ──────────────
+        if hasattr(self, "planner") and self.planner and self.planner.is_complex_goal(user_input):
+            return self.planner.execute_goal(
+                user_input,
+                on_status=on_status,
+                on_sentence=on_sentence,
+            )
+
+        return self._execute_standard_agent_turn(
+            user_input=user_input,
+            on_status=on_status,
+            on_sentence=on_sentence,
+            memory_snippet=memory_snippet,
+            web_context=web_context,
+        )
+
+    def _execute_standard_agent_turn(
+        self,
+        user_input: str,
+        on_status: Optional[Callable[[str], None]] = None,
+        on_sentence: Optional[Callable[[str], None]] = None,
+        memory_snippet: str = "",
+        web_context: str = "",
+    ) -> str:
         # Keep recent dialogue memory compact
         self.conversation.append({"role": "user", "content": user_input})
         if self._estimate_tokens() > Config.COMPRESSION_THRESHOLD:

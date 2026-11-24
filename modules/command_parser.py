@@ -600,10 +600,23 @@ class CommandParser:
             secs = val
         return {"seconds": secs, "label": f"{val} {unit} Timer"}
 
+    def _is_multi_step_chain(self, text: str) -> bool:
+        """Detect multi-step command sequences that should bypass fast single-command parser."""
+        if self.brain and hasattr(self.brain, "planner") and self.brain.planner:
+            return self.brain.planner.is_complex_goal(text)
+        multi_connectors = [
+            "and then", "aur fir", "aur phir", "ke baad", "after that",
+            "along with", "aur saath mein", "step by step", "workflow"
+        ]
+        return any(c in text.lower() for c in multi_connectors)
+
     def parse(self, text: str) -> Optional[Dict[str, Any]]:
         """Parse command and return dict with 'tool' and 'args' without executing."""
         clean = text.lower().strip()
         if not clean:
+            return None
+
+        if self._is_multi_step_chain(clean):
             return None
 
         candidates = [clean]
@@ -641,6 +654,10 @@ class CommandParser:
         """
         clean = text.lower().strip()
         if not clean:
+            return None
+
+        # Multi-step goal check: delegate to ReAct planner
+        if self._is_multi_step_chain(clean):
             return None
 
         # ── 1. Check Safety Confirmation Gate ─────────────────────────────

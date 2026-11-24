@@ -796,3 +796,29 @@ def search_memory(query: str, limit: int = 3) -> str:
 def get_mood_summary(days: int = 7) -> str:
     from core.mood import MoodEngine
     return MoodEngine().get_mood_summary(days=days)
+
+
+@tool(
+    name="execute_autonomous_plan",
+    description="Autonomously decompose and execute a complex multi-step user goal using reason-and-act (ReAct) planning.",
+    params_schema={
+        "type": "object",
+        "properties": {
+            "goal": {"type": "string", "description": "The high-level user goal to plan and execute."}
+        },
+        "required": ["goal"]
+    },
+    risk="medium"
+)
+def execute_autonomous_plan(goal: str) -> str:
+    from core.planner import ReActPlanner
+    from core.llm import UniversalLLMClient
+    from core.config import Config
+    client = UniversalLLMClient(
+        provider=Config.LLM_PROVIDER,
+        api_key=Config.LLM_API_KEY,
+        base_url=Config.LLM_BASE_URL,
+        default_model=Config.LLM_MODEL,
+    )
+    planner = ReActPlanner(client=client)
+    return planner.execute_goal(goal)
