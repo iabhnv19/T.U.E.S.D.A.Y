@@ -163,6 +163,17 @@ def _extract_ocr_elements(img, offset_x: int = 0, offset_y: int = 0) -> List[Dic
     if img is None:
         return []
 
+    from modules.overlay import start_screen_scan, stop_screen_scan
+    start_screen_scan("T.U.E.S.D.A.Y Vision OCR...")
+    try:
+        return _run_ocr_engines(img, offset_x, offset_y)
+    finally:
+        stop_screen_scan()
+
+
+def _run_ocr_engines(img, offset_x: int = 0, offset_y: int = 0) -> List[Dict[str, Any]]:
+    """Internal OCR extraction pipeline."""
+
     elements: List[Dict[str, Any]] = []
 
     # 1. Try Windows Native Media OCR (winocr)
@@ -421,61 +432,66 @@ def analyze_screen(
         win_info = get_active_window()
         return f"Screen capture unavailable. Active foreground window: {win_info}"
 
-    elements = _extract_ocr_elements(img, ox, oy)
-    win_info = get_active_window()
-
-    # Formulate a structured UI spatial state
-    element_lines = []
-    for el in elements[:40]:
-        element_lines.append(f"- '{el['text']}' at position ({el['center'][0]}, {el['center'][1]})")
-
-    elements_text = "\n".join(element_lines) if element_lines else "No text detected."
-
-    ui_context = (
-        f"[ACTIVE WINDOW]: {win_info}\n"
-        f"[ON-SCREEN DETECTED UI ELEMENTS & TEXT ({len(elements)} items)]:\n"
-        f"{elements_text}\n"
-    )
-
-    # Pass the rich visual context to the LLM Brain to reason and answer
-    is_local = Config.LLM_PROVIDER in ("ollama", "lmstudio")
-    if not Config.LLM_API_KEY and not is_local:
-        return f"Local Screen Analysis:\n{ui_context[:600]}"
-
+    from modules.overlay import start_screen_scan, stop_screen_scan
+    start_screen_scan("Analyzing screen...")
     try:
-        from core.llm import UniversalLLMClient
-        client = UniversalLLMClient(
-            provider=Config.LLM_PROVIDER,
-            api_key=Config.LLM_API_KEY,
-            base_url=Config.LLM_BASE_URL,
-            default_model=Config.LLM_MODEL,
-        )
-        resp = client.chat.completions.create(
-            model=client.default_model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are T.U.E.S.D.A.Y, a sharp, witty assistant. "
-                        "The user asked about their current PC screen. Based on the active window and "
-                        "the OCR-detected UI text with coordinates, provide a clear, concise, witty response. "
-                        "If the user wants an action (like clicking something), specify the exact text and coordinates."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": f"User question: {prompt}\n\nLive Screen UI State:\n{ui_context}",
-                },
-            ],
-            max_tokens=300,
-            temperature=0.3,
-        )
-        if resp and resp.choices:
-            return resp.choices[0].message.content.strip()
-    except Exception as e:
-        print(f"[AnalyzeScreen] LLM call fallback: {e}")
+        elements = _extract_ocr_elements(img, ox, oy)
+        win_info = get_active_window()
 
-    return f"Active Screen State:\n{ui_context[:600]}"
+        # Formulate a structured UI spatial state
+        element_lines = []
+        for el in elements[:40]:
+            element_lines.append(f"- '{el['text']}' at position ({el['center'][0]}, {el['center'][1]})")
+
+        elements_text = "\n".join(element_lines) if element_lines else "No text detected."
+
+        ui_context = (
+            f"[ACTIVE WINDOW]: {win_info}\n"
+            f"[ON-SCREEN DETECTED UI ELEMENTS & TEXT ({len(elements)} items)]:\n"
+            f"{elements_text}\n"
+        )
+
+        # Pass the rich visual context to the LLM Brain to reason and answer
+        is_local = Config.LLM_PROVIDER in ("ollama", "lmstudio")
+        if not Config.LLM_API_KEY and not is_local:
+            return f"Local Screen Analysis:\n{ui_context[:600]}"
+
+        try:
+            from core.llm import UniversalLLMClient
+            client = UniversalLLMClient(
+                provider=Config.LLM_PROVIDER,
+                api_key=Config.LLM_API_KEY,
+                base_url=Config.LLM_BASE_URL,
+                default_model=Config.LLM_MODEL,
+            )
+            resp = client.chat.completions.create(
+                model=client.default_model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are T.U.E.S.D.A.Y, a sharp, witty assistant. "
+                            "The user asked about their current PC screen. Based on the active window and "
+                            "the OCR-detected UI text with coordinates, provide a clear, concise, witty response. "
+                            "If the user wants an action (like clicking something), specify the exact text and coordinates."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": f"User question: {prompt}\n\nLive Screen UI State:\n{ui_context}",
+                    },
+                ],
+                max_tokens=300,
+                temperature=0.3,
+            )
+            if resp and resp.choices:
+                return resp.choices[0].message.content.strip()
+        except Exception as e:
+            print(f"[AnalyzeScreen] LLM call fallback: {e}")
+
+        return f"Active Screen State:\n{ui_context[:600]}"
+    finally:
+        stop_screen_scan()
 
 
 # ── UI Automation (pywinauto) ─────────────────────────────────────────────

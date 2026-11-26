@@ -15,7 +15,7 @@ from core.scheduler import BackgroundScheduler
 from core.ambient import AmbientCompanion
 from modules.pc_control import PCController
 from modules.utilities import Utilities
-from modules.overlay import DynamicIsland, TrayIcon
+from modules.overlay import DynamicIsland, ScreenScanOverlay, TrayIcon
 from modules.command_parser import CommandParser
 
 
@@ -372,6 +372,7 @@ def main():
     app.setQuitOnLastWindowClosed(False)
 
     overlay = DynamicIsland()
+    scan_overlay = ScreenScanOverlay()
     tuesday = Tuesday()
     tuesday.run(app, overlay)
 

@@ -271,6 +271,210 @@ class DynamicIsland(QWidget):
         self.update()
 
 
+class ScanSignals(QObject):
+    """Thread-safe signals for the full-screen cyber OCR scan overlay."""
+    start_signal = pyqtSignal(str)
+    stop_signal = pyqtSignal()
+
+
+_active_scan_overlay: Optional["ScreenScanOverlay"] = None
+_scan_depth_lock = threading.Lock()
+_scan_depth = 0
+
+
+def start_screen_scan(label: str = "Scanning screen..."):
+    """Trigger the full-screen glowing cyber border & laser scanline (thread-safe)."""
+    global _scan_depth
+    with _scan_depth_lock:
+        _scan_depth += 1
+        if _active_scan_overlay is not None:
+            try:
+                _active_scan_overlay.signals.start_signal.emit(label)
+            except Exception:
+                pass
+
+
+def stop_screen_scan():
+    """Stop the full-screen cyber scan animation when all nested scans finish."""
+    global _scan_depth
+    with _scan_depth_lock:
+        _scan_depth = max(0, _scan_depth - 1)
+        if _scan_depth == 0 and _active_scan_overlay is not None:
+            try:
+                _active_scan_overlay.signals.stop_signal.emit()
+            except Exception:
+                pass
+
+
+class ScreenScanOverlay(QWidget):
+    """
+    Full-screen transparent click-through overlay shown during OCR & screen analysis.
+    Renders a glowing blue/indigo 4-edge vignette, subtle cyber dot-matrix,
+    a sweeping horizontal laser scanline, and a sleek bottom status capsule.
+    """
+
+    def __init__(self):
+        super().__init__()
+        global _active_scan_overlay
+        _active_scan_overlay = self
+
+        self.signals = ScanSignals()
+        self.signals.start_signal.connect(self._start_scan)
+        self.signals.stop_signal.connect(self._stop_scan)
+
+        self._anim_timer = QTimer(self)
+        self._anim_timer.timeout.connect(self._tick)
+        self._time = 0.0
+        self._scan_y_ratio = 0.0
+        self._opacity_factor = 0.0
+        self._fading_out = False
+        self._label = "T.U.E.S.D.A.Y Vision Scan"
+
+        self._setup_ui()
+
+    def _setup_ui(self):
+        self.setWindowFlags(
+            Qt.FramelessWindowHint
+            | Qt.WindowStaysOnTopHint
+            | Qt.Tool
+            | Qt.WindowDoesNotAcceptFocus
+            | Qt.WindowTransparentForInput
+        )
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+
+        screen = QApplication.primaryScreen()
+        if screen:
+            self.setGeometry(screen.geometry())
+        self.hide()
+
+    def _start_scan(self, label: str):
+        self._label = label or "Scanning screen..."
+        self._fading_out = False
+        self._opacity_factor = max(self._opacity_factor, 0.2)
+        screen = QApplication.primaryScreen()
+        if screen:
+            self.setGeometry(screen.geometry())
+        self.show()
+        if not self._anim_timer.isActive():
+            self._anim_timer.start(16)  # ~60 FPS smooth sweep
+        self.update()
+
+    def _stop_scan(self):
+        self._fading_out = True
+
+    def _tick(self):
+        self._time += 0.07
+        self._scan_y_ratio = (self._scan_y_ratio + 0.018) % 1.0
+
+        if self._fading_out:
+            self._opacity_factor = max(0.0, self._opacity_factor - 0.12)
+            if self._opacity_factor <= 0.01:
+                self._anim_timer.stop()
+                self.hide()
+                return
+        else:
+            self._opacity_factor = min(1.0, self._opacity_factor + 0.15)
+
+        self.update()
+
+    def paintEvent(self, event):
+        if self._opacity_factor <= 0.01:
+            return
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        w = self.width()
+        h = self.height()
+        pulse = 0.78 + 0.22 * math.sin(self._time * 2.2)
+        alpha_scale = self._opacity_factor * pulse
+
+        # ── 1. 4-Edge Glowing Cyber Vignette ────────────────────────────────
+        edge_depth = 120
+        c_outer = QColor(59, 130, 246, int(115 * alpha_scale))   # Electric Blue
+        c_mid = QColor(99, 102, 241, int(45 * alpha_scale))      # Indigo glow
+        c_clear = QColor(59, 130, 246, 0)
+
+        # Top edge
+        g_top = QLinearGradient(0, 0, 0, edge_depth)
+        g_top.setColorAt(0.0, c_outer)
+        g_top.setColorAt(0.45, c_mid)
+        g_top.setColorAt(1.0, c_clear)
+        painter.fillRect(0, 0, w, edge_depth, g_top)
+
+        # Bottom edge
+        g_bot = QLinearGradient(0, h, 0, h - edge_depth)
+        g_bot.setColorAt(0.0, c_outer)
+        g_bot.setColorAt(0.45, c_mid)
+        g_bot.setColorAt(1.0, c_clear)
+        painter.fillRect(0, h - edge_depth, w, edge_depth, g_bot)
+
+        # Left edge
+        g_left = QLinearGradient(0, 0, edge_depth, 0)
+        g_left.setColorAt(0.0, c_outer)
+        g_left.setColorAt(0.45, c_mid)
+        g_left.setColorAt(1.0, c_clear)
+        painter.fillRect(0, 0, edge_depth, h, g_left)
+
+        # Right edge
+        g_right = QLinearGradient(w, 0, w - edge_depth, 0)
+        g_right.setColorAt(0.0, c_outer)
+        g_right.setColorAt(0.45, c_mid)
+        g_right.setColorAt(1.0, c_clear)
+        painter.fillRect(w - edge_depth, 0, edge_depth, h, g_right)
+
+        # Crisp neon perimeter border
+        border_pen = QPen(QColor(96, 165, 250, int(180 * alpha_scale)), 2)
+        painter.setPen(border_pen)
+        painter.drawRect(1, 1, w - 2, h - 2)
+
+        # ── 2. Subtle Cyber Dot-Matrix Texture Near Perimeter ───────────────
+        dot_color = QColor(147, 197, 253, int(55 * alpha_scale))
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(dot_color))
+        step = 28
+        margin = 96
+        for x in range(14, w, step):
+            for y in range(14, h, step):
+                if x < margin or x > w - margin or y < margin or y > h - margin:
+                    painter.drawEllipse(x, y, 2, 2)
+
+        # ── 3. Sweeping Horizontal Laser Scanline ───────────────────────────
+        scan_y = int(self._scan_y_ratio * h)
+        trail_h = 44
+        g_laser = QLinearGradient(0, scan_y - trail_h, 0, scan_y)
+        g_laser.setColorAt(0.0, QColor(56, 189, 248, 0))
+        g_laser.setColorAt(1.0, QColor(56, 189, 248, int(65 * alpha_scale)))
+        painter.fillRect(0, scan_y - trail_h, w, trail_h, g_laser)
+
+        laser_pen = QPen(QColor(56, 189, 248, int(190 * alpha_scale)), 2)
+        painter.setPen(laser_pen)
+        painter.drawLine(0, scan_y, w, scan_y)
+
+        # ── 4. Bottom Floating Status Capsule ───────────────────────────────
+        pill_w, pill_h = 310, 44
+        pill_x = (w - pill_w) // 2
+        pill_y = h - 78
+        path = QPainterPath()
+        path.addRoundedRect(pill_x, pill_y, pill_w, pill_h, 22, 22)
+        painter.fillPath(path, QColor(12, 14, 22, int(220 * self._opacity_factor)))
+        painter.setPen(QPen(QColor(96, 165, 250, int(160 * alpha_scale)), 1.5))
+        painter.drawPath(path)
+
+        # Spinning cyan arc loader inside pill
+        arc_rect = QRect(pill_x + 14, pill_y + 12, 20, 20)
+        painter.setPen(QPen(QColor(56, 189, 248, int(240 * self._opacity_factor)), 2.5))
+        start_angle = int((self._time * 240) % 360) * 16
+        painter.drawArc(arc_rect, start_angle, 220 * 16)
+
+        # Status text
+        painter.setPen(QColor(235, 245, 255, int(245 * self._opacity_factor)))
+        painter.setFont(QFont("Segoe UI", 10, QFont.DemiBold))
+        text_rect = QRect(pill_x + 44, pill_y, pill_w - 56, pill_h)
+        painter.drawText(text_rect, Qt.AlignVCenter | Qt.AlignLeft, self._label)
+
+
 class TrayIcon:
     """System tray icon and menu."""
 
