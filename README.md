@@ -312,42 +312,27 @@ T.U.E.S.D.A.Y uses a hybrid intelligence architecture. Fast commands execute loc
 ```mermaid
 flowchart TD
 
-subgraph group_interaction["Voice and Interface"]
-  node_app["Assistant Runtime<br/>[main.py]"]
-  node_voice["Speech I/O<br/>[voice.py]"]
-  node_overlay["Floating Overlays<br/>[overlay.py]"]
-end
-
-subgraph group_reasoning["Reasoning and Agents"]
-  node_parser["Command Parser<br/>[command_parser.py]"]
-  node_brain["AI Brain<br/>[brain.py]"]
-  node_planner["ReAct Planner<br/>[planner.py]"]
-  node_agents["Specialist Swarm<br/>[agents.py]"]
-  node_llm["Universal LLM<br/>[llm.py]"]
-  node_mood["Mood Engine<br/>[mood.py]"]
-end
-
-subgraph group_actions["Tools and Automation"]
-  node_tool_dispatch["Tool Registry and Safety<br/>[tools.py]"]
-  node_registered["Desktop Action Tools"]
-  node_pc["Windows Control<br/>[pc_control.py]"]
-  node_utilities["System Utilities<br/>[utilities.py]"]
-  node_screen["Screen Understanding<br/>[screen_tools.py]"]
-  node_browser["Browser Operations<br/>[browser_tools.py]"]
-  node_files["File Operations<br/>[file_tools.py]"]
-  node_web["Web Search<br/>[web_search.py]"]
-end
-
-subgraph group_context["Memory and Productivity"]
-  node_productivity["Productivity Tools"]
-  node_memory[("Persistent Memory<br/>[memory.py]")]
-end
-
-subgraph group_proactive["Proactive Support"]
-  node_scheduler["Reminder Scheduler<br/>[scheduler.py]"]
-  node_ambient["Ambient Companion<br/>[ambient.py]"]
-end
-
+node_app["Assistant Runtime<br/>[main.py]"]
+node_voice["Speech I/O<br/>[voice.py]"]
+node_overlay["Floating Overlays<br/>[overlay.py]"]
+node_parser["Command Parser<br/>[command_parser.py]"]
+node_brain["AI Brain<br/>[brain.py]"]
+node_planner["ReAct Planner<br/>[planner.py]"]
+node_agents["Specialist Swarm<br/>[agents.py]"]
+node_llm["Universal LLM<br/>[llm.py]"]
+node_mood["Mood Engine<br/>[mood.py]"]
+node_tool_dispatch["Tool Registry and Safety<br/>[tools.py]"]
+node_registered["Desktop Action Tools"]
+node_pc["Windows Control<br/>[pc_control.py]"]
+node_utilities["System Utilities<br/>[utilities.py]"]
+node_screen["Screen Understanding<br/>[screen_tools.py]"]
+node_browser["Browser Operations<br/>[browser_tools.py]"]
+node_files["File Operations<br/>[file_tools.py]"]
+node_web["Web Search<br/>[web_search.py]"]
+node_productivity["Productivity Tools"]
+node_memory[("Persistent Memory<br/>[memory.py]")]
+node_scheduler["Reminder Scheduler<br/>[scheduler.py]"]
+node_ambient["Ambient Companion<br/>[ambient.py]"]
 node_user(("Desktop User"))
 node_external_services{{"AI and Web Services"}}
 
@@ -407,19 +392,6 @@ click node_productivity "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/mod
 click node_memory "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/core/memory.py"
 click node_scheduler "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/core/scheduler.py"
 click node_ambient "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/core/ambient.py"
-
-classDef toneNeutral fill:#f8fafc,stroke:#334155,stroke-width:1.5px,color:#0f172a
-classDef toneBlue fill:#dbeafe,stroke:#2563eb,stroke-width:1.5px,color:#172554
-classDef toneAmber fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
-classDef toneMint fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
-classDef toneRose fill:#ffe4e6,stroke:#e11d48,stroke-width:1.5px,color:#881337
-classDef toneIndigo fill:#e0e7ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81
-classDef toneTeal fill:#ccfbf1,stroke:#0f766e,stroke-width:1.5px,color:#134e4a
-class node_app,node_voice,node_overlay,node_user toneBlue
-class node_parser,node_brain,node_planner,node_agents,node_llm,node_mood toneAmber
-class node_tool_dispatch,node_registered,node_pc,node_utilities,node_screen,node_browser,node_files,node_web toneMint
-class node_productivity,node_memory toneRose
-class node_scheduler,node_ambient,node_external_services toneIndigo
 ```
 
 ### Main responsibilities
