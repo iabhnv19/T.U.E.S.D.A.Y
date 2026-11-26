@@ -15,7 +15,9 @@ A voice-activated AI desktop assistant for Windows, combining natural Hinglish c
 ![Interface](https://img.shields.io/badge/interface-PyQt5-41CD52?style=for-the-badge&logo=qt&logoColor=white)
 ![Voice](https://img.shields.io/badge/Voice-Edge--TTS%20Neural-00B4D8?style=for-the-badge)
 ![AI](https://img.shields.io/badge/AI-Universal%20LLM%20(Groq%2FOpenAI%2FLocal)-F55036?style=for-the-badge)
-![Architecture](https://img.shields.io/badge/architecture-Tool--Calling%20Agent-6C5CE7?style=for-the-badge)
+![Architecture](https://img.shields.io/badge/architecture-Autonomous%20ReAct-6C5CE7?style=for-the-badge)
+![Multi-Agent](https://img.shields.io/badge/agents-Specialist%20Swarm-blueviolet?style=for-the-badge)
+![Overlay](https://img.shields.io/badge/overlay-Living%20Cyber%20Scan-0984e3?style=for-the-badge)
 
 </div>
 
@@ -23,35 +25,41 @@ A voice-activated AI desktop assistant for Windows, combining natural Hinglish c
 
 ## Why this exists
 
-A desktop assistant should do more than answer questions. It should understand a request, interact with the operating system, work with files and applications, remember useful context, and get out of the way when it is not needed.
+A desktop assistant should do more than answer questions. It should understand a request, interact with the operating system, work with files and applications, remember useful context, anticipate your needs proactively, and get out of the way when it is not needed.
 
-T.U.E.S.D.A.Y is a lightweight, voice-first Windows assistant built around that idea. It combines a fast local command parser for common actions with a Universal LLM AI agent (supporting Groq, OpenAI, OpenRouter, DeepSeek, and local Ollama/LM Studio models) for requests that need reasoning or multiple tools. Its interface is a floating Dynamic Island-style overlay, while its speech layer delivers **Real-Time Streaming Neural Speech** via Microsoft Edge-TTS with Indian English and Hindi support.
+T.U.E.S.D.A.Y is a lightweight, voice-first Windows assistant built around that idea. It combines a fast local command parser for common actions with an **Autonomous ReAct Planner**, a **Specialist Multi-Agent Swarm** (Researcher, Analyst, Writer), a **Proactive Ambient Companion**, and a **Universal LLM AI agent** (supporting Groq, OpenAI, OpenRouter, DeepSeek, and local Ollama/LM Studio models). Its interface pairs a floating Dynamic Island capsule with a **Living Cyber Screen Scan Overlay**, while its speech layer delivers **Real-Time Streaming Neural Speech** via Microsoft Edge-TTS with Indian English and Hindi support.
 
 The interaction loop is designed to stay simple:
 
 ```text
 Press Right Shift + Enter
         -> Speak naturally
-        -> Parse a direct command or ask the AI agent
-        -> Execute approved tools
+        -> Mood engine adapts tone & sentiment
+        -> Parse a direct command, autonomous plan, or agent query
+        -> Execute approved tools with real-time cyber scan feedback
         -> Hear the response stream instantly (~0.3s)
         -> Interrupt speech whenever needed
 ```
 
-Common commands are handled locally without an LLM round trip. More complex requests can use the agent's tool-calling loop, allowing it to combine system, screen, file, browser, memory, and productivity capabilities.
+Common commands are handled locally without an LLM round trip. Multi-step workflows trigger the autonomous planner, while complex web analysis delegates to the specialist swarm.
 
 ## What it provides
 
 | Capability | Description |
 |---|---|
 | Voice interaction | Continuous speech input with real-time streaming neural speech (~0.3s start) |
-| Local command routing | Regex-based command parser with fuzzy application matching |
+| Local command routing | Regex-based command parser with conversational normalizer & fuzzy matching |
 | Universal AI agent | Multi-provider LLM support (Groq, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio) |
+| Autonomous ReAct Planner | Multi-step goal decomposition, tool execution chaining, thought loop & self-correction |
+| Specialist Multi-Agent Swarm | Parallel research fan-out, technical spec comparison, and crisp synthesis |
+| Proactive Ambient Companion | Low-overhead (<1% CPU) background health, fatigue, battery, and schedule monitor |
+| Mood-Adaptive Engine | Real-time sentiment scoring, time-of-day shifting, and SQLite emotion tracking |
+| Living Cyber Scan Overlay | Full-screen content-reactive edge glow, radial energy blooms, and error spotting |
 | Windows automation | Application control, window management, volume, media, and desktop actions |
 | Screen understanding | Dual-engine Python OCR (winocr + RapidOCR), on-screen text search and clicking |
 | File operations | Search, read, create, move, rename, compress, and undo supported file actions |
 | Browser automation | Chromium navigation and interaction through Playwright |
-| Persistent memory | SQLite-backed facts, conversation turns, reminders, todos, and notes |
+| Persistent memory | SQLite-backed facts, conversation turns, reminders, todos, notes, and mood history |
 | Semantic retrieval | ChromaDB-based search over past conversations and indexed documents |
 | Productivity | Reminders, routines, daily briefings, and optional Google Workspace integration |
 | Floating interface | PyQt5 Dynamic Island overlay with animated status and audio visualization |
@@ -147,6 +155,47 @@ Common commands are handled locally without an LLM round trip. More complex requ
 - Capsule sizing adapts to short, medium, and long text.
 - Text and waveform rendering are clipped to the rounded overlay boundary.
 
+### Autonomous ReAct Planner (`core/planner.py`)
+
+- **Multi-Step Goal Decomposition**: Decomposes complex user requests (*"Find all PDFs in downloads, zip them, and move them to desktop"*) into structured, atomic `PlanStep` sequences.
+- **Thought-Action-Observation Loop**: Formulates reasoning thoughts before each tool call, executes the tool, evaluates the observation, and advances the plan.
+- **Autonomous Self-Correction**: When a step encounters an error or missing file, the planner prompts the LLM to inspect the error and replan dynamically on the fly without breaking execution.
+- **Dynamic Island Live Updates**: Streams step progress (e.g. `[Step 2/3] Compressing files...`) directly to the floating capsule.
+
+### Specialist Multi-Agent Swarm (`core/agents.py`)
+
+- **Researcher Agent**: Fans out parallel real-time web searches across sub-queries using thread pooling (`concurrent.futures`).
+- **Analyst Agent**: Scrapes and cross-examines findings, extracts technical specifications, price comparisons, and filters marketing fluff.
+- **Writer Agent**: Synthesizes structured markdown intelligence, automatically persists notes to SQLite, and formats a crisp spoken summary for voice output.
+- **End-to-End Orchestration**: Triggers automatically on deep research or product comparison queries.
+
+### Proactive Ambient Companion (`core/ambient.py`)
+
+- **Lightweight Background Thread**: Operates at `<1% CPU` overhead using Windows `GetLastInputInfo` idle detection and `psutil`.
+- **Ergonomic Fatigue Alerts**: Monitors continuous active screen time and gently suggests short stretch or eye breaks after 90 minutes.
+- **Hardware Health Guardian**: Proactively notifies the user of low battery (<20% unplugged) and high sustained RAM usage (>88%).
+- **Preemptive Reminder Alerts**: Alerts the user of scheduled tasks 15 minutes before the due time.
+- **Contextual Greetings**: Greets the user in the morning with a daily briefing prompt and offers a clean wrap-up in the evening.
+
+### Mood-Adaptive Personality Engine (`core/mood.py`)
+
+- **Real-Time Sentiment Scoring**: Evaluates bilingual English + Hinglish cues for frustration, stress, fatigue, or excitement.
+- **Adaptive Persona Shifting**: Automatically tunes tone:
+  - *Frustrated*: Calm, patient, reassuring, zero humor, direct problem solving.
+  - *Stressed*: Hyper-efficient, concise, skips small talk.
+  - *Tired*: Low cognitive load, soothing, offers task deferral.
+  - *Excited*: Upbeat, celebratory, high-energy.
+- **Time-of-Day Cadence**: Shifts tone from energizing optimism in the morning to calm, quiet brevity late at night.
+- **SQLite Mood Tracking**: Records emotional history to monitor burnout and stress trends over time.
+
+### Living Cyber Screen Scan Overlay (`modules/overlay.py`)
+
+- **Full-Screen Living Vignette**: Breathing glowing edge borders (top, bottom, left, right) rendered via `QLinearGradient` during OCR and screen analysis.
+- **Content-Reactive Color Sampling**: Sub-millisecond dominant screen accent sampling that dynamically lerps border colors to match the active content.
+- **Orbiting Radial Energy Blooms**: Radial gradient blooms highlight spatial UI text centroids and active focus areas.
+- **Error Hotspot Spotter**: Shifts the perimeter glow to coral red (`#F43F5E`) when on-screen error logs, exceptions, or failures are detected.
+- **Silky Pacing**: Smooth exponential easing with a 2.2-second minimum hold timer ensures the scan animation breathes naturally without flickering away prematurely.
+
 ## Quick start
 
 ### Requirements
@@ -232,7 +281,7 @@ The assistant supports a broad command set. These examples cover frequently used
 | Diagnostics | "Clean RAM" | Runs the supported memory-cleanup operation |
 | Network | "What's my IP" / "Check ping" | Reports network information and latency |
 | Desktop | "Clean my desktop" | Organizes loose desktop files |
-| Screen | "What's on my screen" / "Analyze screen" | Maps spatial screen layout via OCR and explains/reasons |
+| Screen | "What's on my screen" / "Analyze screen" | Triggers cyber scan overlay, maps screen layout via OCR, and reasons |
 | Screen | "Find text Submit on screen" | Locates visual element coordinates via local OCR |
 | Screen | "Click text Save on screen" | Clicks element center using OCR-guided coordinates |
 | Screen | "Read screen text" | Extracts on-screen text with layout preservation |
@@ -243,6 +292,9 @@ The assistant supports a broad command set. These examples cover frequently used
 | Apps | "Open Chrome" | Launches an application |
 | Media | "Pause" / "Next track" | Controls media playback |
 | Search | "Google search Python tutorial" | Opens a Google search |
+| Research | "Compare M3 vs Snapdragon X Elite battery" | Specialist Multi-Agent Swarm fans out parallel research |
+| Planner | "Find PDFs in Downloads and zip to Desktop" | Decomposes goal into multi-step ReAct execution plan |
+| Ambient | "How long have I been working" | Proactive ambient check for continuous work time & fatigue |
 | Files | "Search files for invoice" | Searches configured folders |
 | Files | "Read PDF [path]" | Extracts PDF text |
 | Browser | "Open browser to [URL]" | Opens a page in the automation browser |
@@ -253,23 +305,29 @@ The assistant supports a broad command set. These examples cover frequently used
 
 ## Architecture
 
-T.U.E.S.D.A.Y uses a hybrid command architecture. The local parser handles recognized commands directly, while the AI agent handles requests that need language understanding, reasoning, or a sequence of tools.
+T.U.E.S.D.A.Y uses a hybrid intelligence architecture. Fast commands execute locally with zero latency, complex goals trigger the Autonomous ReAct Planner or Specialist Swarm, and general reasoning is routed through the Universal LLM Agent with live visual scan feedback.
 
 ```mermaid
 flowchart TD
-    A["Global hotkey<br/>Right Shift + Enter"] --> B["Voice input<br/>SpeechRecognition"]
+    A["Global hotkey<br/>Right Shift + Enter"] --> B["Voice input<br/>SpeechRecognition (en-IN / hi-IN)"]
     B --> C["Command parser<br/>Regex + rapidfuzz"]
-    C -->|Recognized command| D["Registered tool"]
-    C -->|No local match| E["AI Brain"]
-    E --> F["Groq function-calling loop"]
-    F --> G["Tool registry"]
+    C -->|Local match| D["Registered @tool"]
+    C -->|No local match| M_ENG["MoodEngine<br/>Sentiment & time-of-day tone"]
+    M_ENG --> ROUTE{"Goal Classifier"}
+    ROUTE -->|Multi-step goal| PLAN["ReAct Planner<br/>Decompose & self-correct"]
+    ROUTE -->|Deep research query| SWARM["Specialist Swarm<br/>Researcher + Analyst + Writer"]
+    ROUTE -->|Standard interaction| BRAIN["AI Brain<br/>Universal LLM Loop"]
+    PLAN --> G["Tool registry"]
+    BRAIN --> G
     G --> H["Windows / Screen / Files / Browser / Memory / Productivity"]
-    D --> I["Result"]
+    H -->|OCR / Screen Analysis| SCAN["ScreenScanOverlay<br/>Living cyber edge glow"]
+    D --> I["Execution Result"]
     H --> I
+    SWARM --> I
     I --> J["Natural-language response"]
-    J --> K["gTTS / offline TTS fallback"]
-    K --> L["Dynamic Island overlay"]
-    K --> M["Barge-in listener"]
+    J --> K["Streaming Edge-TTS<br/>en-IN-Neerja / hi-IN-Swara"]
+    K --> L["Dynamic Island overlay<br/>Capsule + ribbon wave"]
+    K --> M["Barge-in listener<br/>'Tuesday stop/chup'"]
     M --> B
 ```
 
@@ -279,21 +337,26 @@ flowchart TD
 |---|---|
 | `main.py` | Application entry point, Qt application lifecycle, global hotkey, listening and barge-in coordination |
 | `core/config.py` | Environment loading, central configuration, and assistant system prompt |
-| `core/brain.py` | AI agent loop, Groq model selection/fallback, tool orchestration, and memory integration |
-| `core/memory.py` | SQLite persistence and ChromaDB-backed semantic memory |
+| `core/brain.py` | AI agent loop, Groq/OpenAI model fallback, tool orchestration, and memory integration |
+| `core/planner.py` | Autonomous ReAct Planner for multi-step goal decomposition, tool chaining, and self-correction |
+| `core/agents.py` | Specialist Multi-Agent Swarm (Researcher, Analyst, Writer) for deep research and synthesis |
+| `core/ambient.py` | Proactive Ambient Intelligence companion monitoring ergonomics, battery, RAM, and habits (<1% CPU) |
+| `core/mood.py` | Mood-Adaptive Personality Engine tracking sentiment, stress, and time-of-day conversational tone |
+| `core/llm.py` | Universal LLM Client supporting Groq, OpenAI, OpenRouter, DeepSeek, Ollama, and LM Studio |
+| `core/memory.py` | SQLite persistence (facts, turns, reminders, todos, notes, moods) and ChromaDB semantic memory |
 | `core/scheduler.py` | Background reminder scheduler |
 | `core/tools.py` | Decorator-based tool registry, schemas, safety gate, confirmation manager, and undo journal |
-| `core/voice.py` | Speech recognition, language handling, text-to-speech, and audio playback |
-| `modules/command_parser.py` | Local regex command routing and fuzzy application matching |
-| `modules/registered_tools.py` | Core registered tools for Windows, utilities, web search, and diagnostics |
-| `modules/screen_tools.py` | Screen inspection, OCR, active-window information, and UI automation |
+| `core/voice.py` | Speech recognition, language handling, real-time streaming Edge-TTS, and audio playback |
+| `modules/command_parser.py` | Local regex command routing, conversational normalizer, and fuzzy application matching |
+| `modules/registered_tools.py` | 45+ registered native tools for Windows, utilities, web search, and diagnostics |
+| `modules/screen_tools.py` | Screen inspection, dual-engine OCR (winocr + RapidOCR), UI click actions, and screen accent sampling |
 | `modules/file_tools.py` | File operations, document extraction, indexing, and retrieval |
 | `modules/browser_tools.py` | Playwright browser automation |
 | `modules/productivity_tools.py` | Reminders, tasks, notes, routines, briefing, and optional Google integration |
 | `modules/pc_control.py` | Windows application, window, media, volume, and system controls |
 | `modules/web_search.py` | Keyless weather, news, and Wikipedia lookup helpers |
 | `modules/utilities.py` | Standalone utility functions |
-| `modules/overlay.py` | PyQt5 Dynamic Island interface and waveform rendering |
+| `modules/overlay.py` | Dual overlay UI: OLED Dynamic Island capsule + Living Cyber ScreenScanOverlay with content-reactive edge glow |
 
 ## Safety, confirmations, and audit logs
 
@@ -339,24 +402,29 @@ T.U.E.S.D.A.Y/
 ├── main.py                      # Application entry point and orchestrator
 │
 ├── core/
-│   ├── config.py                # Configuration and system prompt
+│   ├── config.py                # Configuration and assistant system prompt
 │   ├── brain.py                 # AI agent and tool-calling loop
-│   ├── memory.py                # SQLite and ChromaDB memory
+│   ├── planner.py               # Autonomous ReAct Planner (multi-step decomposition & self-correction)
+│   ├── agents.py                # Specialist Multi-Agent Swarm (Researcher, Analyst, Writer)
+│   ├── ambient.py               # Proactive Ambient Companion (background health, habits & fatigue)
+│   ├── mood.py                  # Mood-Adaptive Personality Engine (real-time sentiment & time-of-day tone)
+│   ├── llm.py                   # Universal LLM Client (Groq, OpenAI, OpenRouter, DeepSeek, Ollama)
+│   ├── memory.py                # SQLite (facts, turns, reminders, todos, notes, moods) & ChromaDB
 │   ├── scheduler.py             # Background reminder scheduler
 │   ├── tools.py                 # Tool registry and safety mechanisms
-│   └── voice.py                 # Speech recognition and speech output
+│   └── voice.py                 # Speech recognition and real-time streaming Edge-TTS
 │
 ├── modules/
 │   ├── registered_tools.py      # Core registered tools
-│   ├── screen_tools.py          # Screen analysis, OCR, and UI automation
+│   ├── screen_tools.py          # Screen analysis, OCR, UI automation, and screen accent sampling
 │   ├── file_tools.py            # File handling, documents, and RAG
 │   ├── browser_tools.py          # Playwright browser automation
 │   ├── productivity_tools.py    # Productivity and Google integrations
 │   ├── pc_control.py             # Windows automation
-│   ├── command_parser.py        # Local command parser
+│   ├── command_parser.py        # Local command parser & conversational speech normalizer
 │   ├── web_search.py             # Weather, news, and knowledge lookup
 │   ├── utilities.py              # Utility helpers
-│   └── overlay.py                # Dynamic Island UI
+│   └── overlay.py                # Dynamic Island capsule & Living Cyber ScreenScanOverlay
 │
 ├── logs/                         # Runtime audit and undo logs
 ├── memory/                       # Local databases and persistent assistant data
@@ -364,12 +432,17 @@ T.U.E.S.D.A.Y/
     ├── test_phase1.py            # Core tools, schemas, agent, safety, parser
     ├── test_phase3.py            # Memory and semantic search
     ├── test_phase456.py          # Screen, file, RAG, and browser tests
-    └── test_phase7.py            # Productivity and Google integration tests
+    ├── test_phase7.py            # Productivity and Google integration tests
+    ├── test_smart_router.py      # Intent router and normalizer tests
+    ├── test_universal_llm.py     # Multi-provider LLM client tests
+    ├── test_mood.py              # Mood engine and sentiment tests
+    ├── test_planner.py           # ReAct planner multi-step chaining tests
+    └── test_ambient_and_swarm.py # Ambient companion & multi-agent swarm tests
 ```
 
 ## Development and testing
 
-Run the test suite from the repository root:
+Run the full test suite (76 tests across 9 test suites) from the repository root:
 
 ```bash
 python -m pytest tests/ -v
@@ -387,6 +460,15 @@ The architecture index also documents direct tool-execution examples for develop
 python -c "from core.tools import execute_tool; print(execute_tool('get_active_window', {}))"
 python -c "from core.tools import execute_tool; print(execute_tool('search_files', {'query': 'invoice'}))"
 python -c "from core.tools import execute_tool; print(execute_tool('browser_close', {}))"
+```
+
+Run targeted tests for specific intelligence subsystems:
+
+```bash
+python -m pytest tests/test_planner.py -v
+python -m pytest tests/test_ambient_and_swarm.py -v
+python -m pytest tests/test_mood.py -v
+python -m pytest tests/test_smart_router.py -v
 ```
 
 Some tests exercise Windows-specific functionality or optional integrations. Their results may depend on the host environment and installed services.

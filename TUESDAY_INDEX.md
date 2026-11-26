@@ -10,7 +10,8 @@
 - **Role**: Lightweight, proactive, Windows desktop voice assistant inspired by Friday/JARVIS.
 - **Persona**: Female voice, sharp, witty, warm, conversational Hinglish (Hindi + English) speaker. Strict no-emoji rule and tight natural punctuation cadence.
 - **User Gender**: Male, addressed respectfully as 'Sir' or 'Boss' (`karoge`, `aap sunao`, `Sir`, `Boss`). Strict ban on 'bhai'.
-- **Core Loop**: Global Hotkey (`Right Shift + Enter`) → Continuous Active Listening until 5s silence → Local Regex Command Parser (Zero API Latency) → Universal LLM Brain with tool-calling agent loop (Groq, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio) → Real-Time Streaming Neural Voice (Edge-TTS `en-IN-NeerjaNeural` / `hi-IN-SwaraNeural`) with instant mid-generation playback (~0.3s start) and real-time Barge-In cancellation → Floating OLED Dynamic Island Overlay UI.
+- **Core Loop**: Global Hotkey (`Right Shift + Enter`) → Continuous Active Listening until 5s silence → Local Regex Command Parser (Zero API Latency) → Autonomous ReAct Planner / Universal LLM Brain with tool-calling agent loop (Groq, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio) → Specialist Multi-Agent Swarm (Research, Analysis, Writing) → Mood-Adaptive Personality Engine (real-time sentiment & time-of-day shifting) → Real-Time Streaming Neural Voice (Edge-TTS `en-IN-NeerjaNeural` / `hi-IN-SwaraNeural`) with instant mid-generation playback (~0.3s start) and real-time Barge-In cancellation → Floating OLED Dynamic Island Overlay UI & Living Cyber ScreenScanOverlay.
+- **Background Intelligence**: Proactive Ambient Companion (<1% CPU idle/habit/health monitor) + Background Reminder Scheduler.
 
 ---
 
@@ -30,41 +31,49 @@ E:\T.U.E.S.D.A.Y\
 ├── core/
 │   ├── config.py            # Central settings, environment loader, and core SYSTEM_PROMPT
 │   ├── brain.py             # Agentic AI Brain: multi-hop tool loop, fallback chain, SentenceChunker, memory integration
+│   ├── planner.py           # Autonomous ReAct Planner: multi-step goal decomposition, tool chaining & self-correction
+│   ├── agents.py            # Specialist Multi-Agent Swarm: ResearcherAgent, AnalystAgent, WriterAgent
+│   ├── ambient.py           # Proactive Ambient Companion: background idle, health, fatigue & habit monitor
+│   ├── mood.py              # Mood-Adaptive Personality Engine: real-time sentiment scoring & time-of-day shifts
 │   ├── llm.py               # Universal LLM Client: Groq, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio + token streaming
-│   ├── memory.py            # MemoryStore: SQLite facts/turns/reminders/todos/notes + ChromaDB
+│   ├── memory.py            # MemoryStore: SQLite facts/turns/reminders/todos/notes/moods + ChromaDB
 │   ├── scheduler.py         # BackgroundScheduler thread checking due reminders & triggering alerts
 │   ├── tools.py             # Decorator-based @tool registry, schema auto-normalizer, safety gate & undo journal
 │   └── voice.py             # Bilingual STT & Real-Time Streaming Neural TTS (Edge-TTS, gTTS, pyttsx3)
 │
 ├── modules/
-│   ├── registered_tools.py  # 40+ native tools wrapping PC, web search, utilities, and diagnostics
-│   ├── screen_tools.py      # Phase 4: Screen analysis, active window, dual-engine OCR (winocr + RapidOCR), UI click actions
-│   ├── file_tools.py        # Phase 5: Fast file search, PDF/DOCX readers, RAG indexing & file manipulation
-│   ├── browser_tools.py     # Phase 6: Playwright browser navigation, interaction, and search
-│   ├── productivity_tools.py# Phase 7: Reminders, todos, notes, routines, daily briefing, Google OAuth
+│   ├── registered_tools.py  # 45+ native tools wrapping PC, web search, utilities, and diagnostics
+│   ├── screen_tools.py      # Screen analysis, active window, dual-engine OCR (winocr + RapidOCR), UI click actions & accent sampling
+│   ├── file_tools.py        # Fast file search, PDF/DOCX readers, RAG indexing & file manipulation
+│   ├── browser_tools.py     # Playwright browser navigation, interaction, and search
+│   ├── productivity_tools.py# Reminders, todos, notes, routines, daily briefing, Google OAuth
 │   ├── pc_control.py        # Windows automation: apps, tabs, volume, media, snapping, telemetry
 │   ├── command_parser.py    # Zero-latency parser: conversational normalizer, regex table + rapidfuzz matching, action intent detection
 │   ├── web_search.py        # Keyless tri-engine: wttr.in (weather), Google News RSS, Wikipedia
 │   ├── utilities.py         # Standalone helpers: timers, math, datetime, web shortcuts
-│   └── overlay.py           # PyQt5 Dynamic Island UI with LERP glide & Siri fluid ribbon wave
+│   └── overlay.py           # Dual Overlay UI: OLED Dynamic Island capsule + Living Cyber ScreenScanOverlay
 │
 ├── logs/                    # Audit & safety logs
 │   ├── actions.jsonl        # Complete execution history: timestamp, tool, args, risk, confirmed, result
 │   └── undo_journal.json    # Reversible actions journal (desktop moves, file moves, renames)
 │
 ├── memory/                  # Local runtime persistence
-│   ├── tuesday.db           # SQLite database: user_facts, conversation_turns, reminders, todos, notes
+│   ├── tuesday.db           # SQLite database: user_facts, conversation_turns, reminders, todos, notes, user_moods
 │   ├── chroma_db/           # ChromaDB persistent vector database (all-MiniLM-L6-v2 embeddings)
 │   ├── routines.json        # Custom named automation sequences (study mode, good night, etc.)
 │   ├── conversation_history.json  # Legacy dialogue history (auto-migrated to SQLite)
 │   └── user_profile.json          # Legacy user facts (auto-migrated to SQLite)
 │
 └── tests/
-    ├── test_phase1.py       # Unit tests: tools, schemas, agent loop, safety gate, fuzzy parser
-    ├── test_phase3.py       # Memory tests: SQLite CRUD, ChromaDB semantic search, privacy guard
-    ├── test_phase456.py     # Screen/OCR, File/Undo/RAG, and Playwright browser integration tests
-    └── test_phase7.py       # Productivity, Reminders, Todos, Notes, Routines, Briefing, Google tests
-```
+    ├── test_phase1.py            # Unit tests: tools, schemas, agent loop, safety gate, fuzzy parser
+    ├── test_phase3.py            # Memory tests: SQLite CRUD, ChromaDB semantic search, privacy guard
+    ├── test_phase456.py          # Screen/OCR, File/Undo/RAG, and Playwright browser integration tests
+    ├── test_phase7.py            # Productivity, Reminders, Todos, Notes, Routines, Briefing, Google tests
+    ├── test_smart_router.py      # Intent router & conversational speech normalizer tests
+    ├── test_universal_llm.py     # Multi-provider LLM client & fallback chain tests
+    ├── test_mood.py              # Mood-Adaptive Personality Engine & sentiment tests
+    ├── test_planner.py           # Autonomous ReAct Planner multi-step chaining tests
+    └── test_ambient_and_swarm.py # Ambient Companion & Specialist Multi-Agent Swarm tests
 
 ---
 
@@ -83,28 +92,41 @@ E:\T.U.E.S.D.A.Y\
         ┌────────────────────────────────────────────────────────┐
         │ modules/command_parser.py (try_parse)                  │
         │ - Normalizes conversational speech (strips 'tuesday',  │
-        │   'bhai', 'ek kaam karo', 'please', 'na', etc.)        │
+        │   'ek kaam karo', 'please', 'na', etc.)                │
         │ - Table-driven regex + rapidfuzz fuzzy app matching    │
         │ - Direct routing for screen, file, browser, PC actions │
         │ - Checks ConfirmationManager for high-risk approvals   │
         └────────────────────────────────────────────────────────┘
                  │                                │
-            [YES: Local]                      [NO: AI Brain]
+            [YES: Local]                      [NO: AI Intelligence]
                  │                                │
                  ▼                                ▼
-       Execute registered @tool        core/brain.py (AIBrain.think)
-       (direct Python execution)                  │
-                 │                      Action/Tool intent detected?
-                 │                       ├── NO  -> Pure Chat Mode (tools=None)
-                 │                       │          ~150 tokens, instant ~200ms reply
-                 │                       └── YES -> Attach 99 Tool Schemas
-                 │                                  Multi-hop agent loop
+       Execute registered @tool        core/mood.py (MoodEngine)
+       (direct Python execution)       - Detects user sentiment & emotion
+                 │                     - Injects time-of-day tone adaptively
                  │                                │
-                 │                      Groq/OpenAI Function Calling Loop
-                 │                      (Auto-model fallback if 429)
+                 │                     Multi-Step Goal or Deep Query?
+                 │                     ├── Multi-Step Goal -> core/planner.py (ReActPlanner)
+                 │                     │                      Decomposes goal into steps,
+                 │                     │                      executes tool chain with self-correction
+                 │                     ├── Deep Web Research -> core/agents.py (AgentSwarm)
+                 │                     │                      Researcher + Analyst + Writer
+                 │                     │                      parallel fan-out & synthesis
+                 │                     └── Standard Interaction -> core/brain.py (AIBrain)
                  │                                │
-                 │                      Streaming TTS sentence queue
-                 │                      (Edge-TTS neural voices)
+                 │                     Action/Tool intent detected?
+                 │                      ├── NO  -> Pure Chat Mode (tools=None)
+                 │                      │          ~150 tokens, instant ~200ms reply
+                 │                      └── YES -> Attach Tool Schemas
+                 │                                 Multi-hop Groq/OpenAI agent loop
+                 │                                │
+                 │                     Screen Analysis / OCR triggered?
+                 │                      └── YES -> modules/overlay.py (ScreenScanOverlay)
+                 │                                 Full-screen living cyber edge glow +
+                 │                                 content-reactive accent color lerping
+                 │                                │
+                 │                     Streaming TTS sentence queue
+                 │                     (Edge-TTS neural voices)
                  │                                │
                  └────────────────┬───────────────┘
                                   │
@@ -254,6 +276,51 @@ E:\T.U.E.S.D.A.Y\
 | *"Unread emails"*, *"Check mail"* | `list_unread_emails` | Reads unread Gmail message subjects and senders. |
 | *"Draft email reply <id> <text>"* | `draft_email_reply` | Creates draft in Gmail (draft only, sending requires confirmation). |
 
+### L. Autonomous ReAct Planner (`core/planner.py`)
+| Capability / Trigger | Component | Description |
+|---|---|---|
+| Multi-step complex goals (e.g., *"Find all PDFs in downloads, zip them, and move to desktop"*) | `ReActPlanner.create_plan` | Automatically detects multi-step goals, decomposes them into structured `PlanStep` sequences, and produces a thought chain. |
+| Autonomous Execution Loop | `ReActPlanner.execute_plan` | Executes tool calls sequentially, logs execution observations, and detects step success or failure. |
+| Self-Correction & Replanning | `ReActPlanner._replan_from_failure` | When a step fails, prompts LLM with error state to dynamically generate alternative steps without crashing the session. |
+| Dynamic Island Live Status | `status_callback` | Updates overlay with active step progress (e.g. `[Step 2/3] Moving zip...`). |
+
+### M. Specialist Multi-Agent Swarm (`core/agents.py`)
+| Specialist Agent | Class Name | Function |
+|---|---|---|
+| **Researcher Agent** | `ResearcherAgent` | Fans out parallel real-time web searches across sub-topics via `concurrent.futures`. |
+| **Analyst Agent** | `AnalystAgent` | Cross-checks findings, extracts technical specs & pricing matrices, and strips commercial marketing fluff. |
+| **Writer Agent** | `WriterAgent` | Formats structured multi-source intelligence, optionally saves a note to SQLite, and synthesizes a punchy spoken summary. |
+| **Swarm Orchestrator** | `AgentSwarm.run` | Coordinates Researcher, Analyst, and Writer pipeline end-to-end for deep questions (*"Compare M3 vs Snapdragon X Elite laptop battery and price"*). |
+
+### N. Proactive Ambient Companion (`core/ambient.py`)
+| Ambient Monitor | Frequency / Trigger | Action |
+|---|---|---|
+| **Ergonomic Fatigue Guard** | Continuous work > 90 mins | Suggests a 5-minute stretch or eye break through speech & Dynamic Island. |
+| **Low Battery Alert** | Battery < 20% & unplugged | Proactively alerts user to plug in laptop before shutdown. |
+| **High Memory Warning** | RAM usage > 88% sustained | Suggests or offers automated memory optimization (`clean_ram`). |
+| **Upcoming Reminder Alert** | Reminders due in < 15 mins | Proactively mentions pending task before the deadline arrives. |
+| **Contextual Habit Detection** | Work session start / Evening wrap | Welcomes user in morning with daily briefing prompt; offers evening wrap-up. |
+
+### O. Mood-Adaptive Personality Engine (`core/mood.py`)
+| Emotion / Tone | Trigger Lexicon / Conditions | Adaptive Persona Shift |
+|---|---|---|
+| **Frustrated** (`score: -0.8`) | *"bekar"*, *"kharab"*, *"useless"*, *"hang"*, *"bug"*, *"dimag kharab"* | Deeply empathetic, patient, calm, reassuring. Zero jokes, immediate assistance. |
+| **Stressed** (`score: -0.6`) | *"tension"*, *"urgent"*, *"deadline"*, *"pressure"*, *"panic"*, *"load"* | Crisp, hyper-efficient, action-oriented. Skips small-talk and solves blockers. |
+| **Tired / Fatigued** (`score: -0.4`) | *"thak gaya"*, *"exhausted"*, *"tired"*, *"sleepy"*, *"neend"* | Soft, soothing, low cognitive load. Offers to defer non-critical tasks. |
+| **Happy / Excited** (`score: +0.7`) | *"great"*, *"awesome"*, *"shabash"*, *"mast"*, *"party"*, *"kamaal"* | High energy, sharp, upbeat, celebrates accomplishments. |
+| **Time-of-Day Shifting** | Morning (5–12) / Afternoon / Night (22–5) | Injects energizing optimism in morning; calm, low-energy brevity late at night. |
+| **Mood Persistence** | SQLite table `user_moods` | Tracks emotional valence over time to notice chronic stress or burnout. |
+
+### P. Living Cyber Screen Scan Overlay (`modules/overlay.py` + `screen_tools.py`)
+| Visual Element | Implementation | Behavior |
+|---|---|---|
+| **Edge Glow Vignette** | 4-Edge `QLinearGradient` (Top, Bottom, Left, Right) | Silky breathing cyber glow framing the screen during OCR and screen analysis. |
+| **Radial Energy Blooms** | `QRadialGradient` hotspots | Content-reactive illumination tracking active UI focus points and OCR text centroids. |
+| **Perimeter Dot-Matrix Grid** | Cyber aesthetic dot pattern | Retro-futuristic texture bordering the desktop perimeter. |
+| **Dynamic Color Sampling** | `screen_tools._sample_screen_accent` | Sub-millisecond dominant screen accent color sampling (lerps between current and target colors). |
+| **Error Hotspot Alert** | Red alert RGB (`#F43F5E`) | Automatically turns edge glow red if keywords like `error`, `exception`, or `failed` are spotted on screen. |
+| **Silky Pacing & Hold Timer** | Exponential LERP + 2.2s hold | Prevents sub-second OCR from flickering away; holds glow smoothly then fades out gracefully. |
+
 ---
 
 ## 5. Tool-Calling Architecture & Safety Protocol
@@ -277,7 +344,7 @@ def open_app(app_name: str) -> str:
 
 ### Safety Gate & Confirmation Manager
 - Tools classified with `risk="high"` (`shutdown_pc`, `restart_pc`, `lock_pc`, `empty_recycle_bin`, `organize_desktop`, dangerous button clicks, payment submissions) require explicit confirmation.
-- If called without prior confirmation, `execute_tool` holds execution and responds with a prompt (e.g. *"Bhai, kya sach mein PC shutdown kar doon?"*).
+- If called without prior confirmation, `execute_tool` holds execution and responds with a prompt (e.g. *"Sir, kya sach mein PC shutdown kar doon?"*).
 - When the user confirms in the next turn (*"haan"*, *"yes"*, *"kar do"*), the action is executed. If denied (*"nahi"*, *"cancel"*), the action is aborted.
 
 ### Audit Logging & Undo Journal
@@ -304,8 +371,9 @@ The assistant connects to any AI provider via `core/llm.py` (`UniversalLLMClient
 
 ---
 
-## 7. Overlay UI Specifications (`DynamicIsland`)
+## 7. Dual Overlay UI Specifications (`modules/overlay.py`)
 
+### A. Dynamic Island (`DynamicIsland`)
 - **Design**: Pure OLED black capsule (`#08090E`, opacity 250) with 1px glassmorphic specular top highlight.
 - **Physics**: Silk-smooth exponential asymptotic LERP (`lerp_factor = 0.16`). Moves 16% of the remaining distance per frame. Zero harmonic oscillation, zero bounce, zero jiggle.
 - **Clipping**: `QPainter.setClipPath(path)` strictly enforces that text and waves never bleed outside the rounded capsule borders.
@@ -318,6 +386,15 @@ The assistant connects to any AI provider via `core/llm.py` (`UniversalLLMClient
   - Short (<= 20 chars): `280px × 48px`
   - Medium (<= 50 chars): `400px × 52px`
   - Long (> 50 chars): `520px × 60px`
+
+### B. Living Cyber Screen Scan Overlay (`ScreenScanOverlay`)
+- **Framing**: Full-screen transparent overlay (`FramelessWindowHint | WindowStaysOnTopHint | WindowTransparentForInput`).
+- **Edge Vignette**: 4-edge directional gradient blooms (`QLinearGradient`) at top, bottom, left, and right (70px depth) that breathe smoothly while OCR or screen analysis is running.
+- **Content-Reactive Accent**: Dynamic color lerp (`_curr_rgb` to `_target_rgb`) sampled from the active screen's dominant color palette via `_sample_screen_accent`.
+- **Dynamic Hotspot Blooms**: Orbiting radial gradient blooms (`QRadialGradient`) that illuminate the screen's active visual focus or detected OCR text centroids.
+- **Error Spotter Mode**: Automatically shifts border vignette to coral red (`#F43F5E`) when keywords like `error`, `exception`, `failed`, or `traceback` are detected on screen.
+- **Smooth Pacing**: Asymptotic ease-in bloom (`_opacity_factor += (1.0 - _opacity_factor) * 0.055`), minimum 2.2-second hold timer (`_min_hold_ms = 2200`) to prevent sub-second flashes, and graceful exponential dissolve (`_opacity_factor *= 0.92`).
+- **Thread-Safe Signals**: Controlled via `start_screen_scan(label, accent_rgb)`, `update_screen_scan(...)`, and `stop_screen_scan()`.
 
 ---
 
@@ -345,8 +422,15 @@ The assistant connects to any AI provider via `core/llm.py` (`UniversalLLMClient
 ## 9. Developer Quick Reference & Testing
 
 ```bash
-# Run complete test suite (Phase 1 + 3 + 4 + 5 + 6: 30 tests)
+# Run complete test suite (76 tests across 9 test suites)
 python -m pytest tests/ -v
+
+# Run individual targeted test suites
+python -m pytest tests/test_planner.py -v
+python -m pytest tests/test_ambient_and_swarm.py -v
+python -m pytest tests/test_mood.py -v
+python -m pytest tests/test_smart_router.py -v
+python -m pytest tests/test_phase456.py -v
 
 # Start assistant
 python main.py
