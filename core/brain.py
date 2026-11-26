@@ -119,6 +119,8 @@ class AIBrain:
         self.mood_engine = MoodEngine(self.memory)
         from core.planner import ReActPlanner
         self.planner = ReActPlanner(client=self.client, brain=self, memory=self.memory)
+        from core.agents import AgentSwarm
+        self.swarm = AgentSwarm(client=self.client, brain=self, memory=self.memory)
         self.available_models: List[str] = list(self.client.fallback_models)
         self.current_model_index: int = 0
         self.turn_count: int = 0
@@ -339,7 +341,15 @@ class AIBrain:
                 if search_data:
                     web_context = f"\n[LIVE FACTS]:\n{search_data[:1000]}\nUse these live facts to answer accurately."
 
-        # ── 5. Autonomous ReAct Planner for Multi-Step Goals ──────────────
+        # ── 5. Specialist Multi-Agent Swarm for Deep Research / Comparison ─
+        if hasattr(self, "swarm") and self.swarm and self.swarm.is_swarm_query(user_input):
+            return self.swarm.run_swarm(
+                user_input,
+                on_status=on_status,
+                on_sentence=on_sentence,
+            )
+
+        # ── 6. Autonomous ReAct Planner for Multi-Step Goals ──────────────
         if hasattr(self, "planner") and self.planner and self.planner.is_complex_goal(user_input):
             return self.planner.execute_goal(
                 user_input,

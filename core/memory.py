@@ -114,6 +114,15 @@ class MemoryStore:
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS habit_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    hour_of_day INTEGER NOT NULL,
+                    app_name TEXT NOT NULL,
+                    day_key TEXT NOT NULL,
+                    UNIQUE(hour_of_day, app_name, day_key)
+                )
+            """)
             conn.commit()
 
     def _migrate_legacy_profile(self):
@@ -564,4 +573,34 @@ class MemoryStore:
                 (cutoff,)
             ).fetchall()
             return [dict(r) for r in rows]
+
+    # ── Workflow Habit Tracking ──────────────────────────────────────────────
+
+    def log_habit(self, hour_of_day: int, app_name: str, day_key: Optional[str] = None) -> None:
+        """Record an app used at a specific hour of day (deduplicated per day)."""
+        if not app_name:
+            return
+        d_key = day_key or datetime.now().strftime("%Y-%m-%d")
+        with self._get_connection() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO habit_logs (hour_of_day, app_name, day_key) VALUES (?, ?, ?)",
+                (int(hour_of_day), app_name.lower().strip(), d_key)
+            )
+            conn.commit()
+
+    def get_frequent_habits(self, hour_of_day: int, min_days: int = 3) -> List[str]:
+        """Return app names used on at least `min_days` distinct days at the given hour."""
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT app_name, COUNT(DISTINCT day_key) as day_count
+                FROM habit_logs
+                WHERE hour_of_day = ?
+                GROUP BY app_name
+                HAVING day_count >= ?
+                ORDER BY day_count DESC
+                """,
+                (int(hour_of_day), int(min_days))
+            ).fetchall()
+            return [r["app_name"] for r in rows]
 

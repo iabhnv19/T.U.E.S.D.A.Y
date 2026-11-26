@@ -822,3 +822,29 @@ def execute_autonomous_plan(goal: str) -> str:
     )
     planner = ReActPlanner(client=client)
     return planner.execute_goal(goal)
+
+
+@tool(
+    name="run_research_swarm",
+    description="Spawn parallel Researcher, Analyst, and Writer micro-agents for deep web research and product/tech comparisons.",
+    params_schema={
+        "type": "object",
+        "properties": {
+            "goal": {"type": "string", "description": "Research or comparison question to investigate."}
+        },
+        "required": ["goal"]
+    },
+    risk="low"
+)
+def run_research_swarm(goal: str) -> str:
+    from core.agents import AgentSwarm
+    from core.llm import UniversalLLMClient
+    from core.config import Config
+    client = UniversalLLMClient(
+        provider=Config.LLM_PROVIDER,
+        api_key=Config.LLM_API_KEY,
+        base_url=Config.LLM_BASE_URL,
+        default_model=Config.LLM_MODEL,
+    )
+    swarm = AgentSwarm(client=client)
+    return swarm.run_swarm(goal)

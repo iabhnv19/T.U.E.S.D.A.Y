@@ -12,6 +12,7 @@ from core.config import Config
 from core.brain import AIBrain
 from core.voice import VoiceEngine
 from core.scheduler import BackgroundScheduler
+from core.ambient import AmbientCompanion
 from modules.pc_control import PCController
 from modules.utilities import Utilities
 from modules.overlay import DynamicIsland, TrayIcon
@@ -71,6 +72,9 @@ class Tuesday:
         self.scheduler = BackgroundScheduler()
         self.scheduler.register_callback(self._on_reminder_fire)
 
+        self.ambient = AmbientCompanion(self.brain.memory)
+        self.ambient.register_callback(self._on_ambient_alert)
+
         self._is_active = False
         self._running = True
 
@@ -99,6 +103,7 @@ class Tuesday:
         print(f"  ✓ Press [{Config.HOTKEY_MODIFIER} + {Config.HOTKEY_KEY}] for Active Mode\n")
 
         self.scheduler.start()
+        self.ambient.start()
         # Launch initial startup briefing check in background thread
         threading.Thread(target=self._run_startup_sequence, daemon=True).start()
 
@@ -341,11 +346,21 @@ class Tuesday:
         rec_tag = " (Daily)" if recurring == "daily" else (" (Weekly)" if recurring == "weekly" else "")
         self.voice.speak_async(f"Sir, aapka reminder hai: {title}{rec_tag}")
 
+    def _on_ambient_alert(self, alert_type: str, message: str):
+        """Handle proactive ambient companion nudges (work break, battery, schedule, habits)."""
+        print(f"\n[Ambient:{alert_type}] 💡 {message}")
+        if hasattr(self, "overlay") and self.overlay:
+            self.overlay.show_status("alert", message, auto_hide_ms=6500)
+        # Speak only when not actively listening or mid-speech
+        if not self._is_active and not self.voice.is_speaking:
+            self.voice.speak_async(message)
+
     def _quit(self):
         """Clean shutdown."""
         self._running = False
         self._is_active = False
         self.scheduler.stop()
+        self.ambient.stop()
         self.voice.speak("Shutting down. Goodbye.")
         print(f"\n  {Config.NAME} shutting down...")
         self.tray.stop()
