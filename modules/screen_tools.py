@@ -155,6 +155,23 @@ def _capture_screenshot(region: Optional[str] = None):
             return None, 0, 0
 
 
+def _sample_screen_accent(img) -> tuple:
+    """Fast (<1ms) dominant accent RGB sampler from captured screenshot."""
+    try:
+        tiny = img.convert("RGB").resize((16, 16))
+        pixels = list(tiny.getdata())
+        # Pick the most colorful/vibrant pixels so dark themes still get a vivid glow
+        best = max(pixels, key=lambda p: max(p) - min(p) + (sum(p) * 0.15))
+        r, g, b = best
+        # If screen is near grayscale, default to electric cyan-blue
+        if max(best) - min(best) < 25:
+            return (59, 130, 246)
+        # Boost vibrancy slightly
+        return (min(255, int(r * 0.85 + 35)), min(255, int(g * 0.85 + 40)), min(255, int(b * 0.85 + 55)))
+    except Exception:
+        return (59, 130, 246)
+
+
 def _extract_ocr_elements(img, offset_x: int = 0, offset_y: int = 0) -> List[Dict[str, Any]]:
     """
     Run local Python OCR engines (WinOCR + RapidOCR) and return structured text elements:
@@ -163,10 +180,28 @@ def _extract_ocr_elements(img, offset_x: int = 0, offset_y: int = 0) -> List[Dic
     if img is None:
         return []
 
-    from modules.overlay import start_screen_scan, stop_screen_scan
-    start_screen_scan("T.U.E.S.D.A.Y Vision OCR...")
+    from modules.overlay import start_screen_scan, update_screen_scan, stop_screen_scan
+    accent = _sample_screen_accent(img)
+    start_screen_scan("T.U.E.S.D.A.Y Vision OCR...", accent_rgb=accent)
     try:
-        return _run_ocr_engines(img, offset_x, offset_y)
+        elements = _run_ocr_engines(img, offset_x, offset_y)
+        if elements:
+            # Steer living glow toward text centroid and spike energy
+            w = max(1, img.width)
+            h = max(1, img.height)
+            avg_x = sum(el["center"][0] - offset_x for el in elements) / len(elements)
+            avg_y = sum(el["center"][1] - offset_y for el in elements) / len(elements)
+            joined_lower = " ".join(el["text"].lower() for el in elements[:25])
+            has_error = any(k in joined_lower for k in ("error", "exception", "failed", "traceback"))
+            react_rgb = (244, 63, 94) if has_error else accent
+            update_screen_scan(
+                label=f"Read {len(elements)} elements...",
+                accent_rgb=react_rgb,
+                intensity=1.45,
+                hotspot_x=avg_x / w,
+                hotspot_y=avg_y / h,
+            )
+        return elements
     finally:
         stop_screen_scan()
 
@@ -433,7 +468,7 @@ def analyze_screen(
         return f"Screen capture unavailable. Active foreground window: {win_info}"
 
     from modules.overlay import start_screen_scan, stop_screen_scan
-    start_screen_scan("Analyzing screen...")
+    start_screen_scan("Analyzing screen...", accent_rgb=_sample_screen_accent(img))
     try:
         elements = _extract_ocr_elements(img, ox, oy)
         win_info = get_active_window()

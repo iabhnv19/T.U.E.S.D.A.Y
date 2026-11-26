@@ -7,7 +7,7 @@ from PyQt5.QtCore import (
     Qt, QTimer, pyqtSignal, QObject, QRect
 )
 from PyQt5.QtGui import (
-    QColor, QPainter, QBrush, QPen, QFont, QPainterPath, QLinearGradient
+    QColor, QPainter, QBrush, QPen, QFont, QPainterPath, QLinearGradient, QRadialGradient
 )
 
 from core.config import Config
@@ -273,7 +273,8 @@ class DynamicIsland(QWidget):
 
 class ScanSignals(QObject):
     """Thread-safe signals for the full-screen cyber OCR scan overlay."""
-    start_signal = pyqtSignal(str)
+    start_signal = pyqtSignal(str, int, int, int)
+    update_signal = pyqtSignal(str, int, int, int, float, float, float)
     stop_signal = pyqtSignal()
 
 
@@ -282,16 +283,35 @@ _scan_depth_lock = threading.Lock()
 _scan_depth = 0
 
 
-def start_screen_scan(label: str = "Scanning screen..."):
-    """Trigger the full-screen glowing cyber border & laser scanline (thread-safe)."""
+def start_screen_scan(label: str = "Scanning screen...", accent_rgb: tuple = (59, 130, 246)):
+    """Trigger the full-screen living content-reactive edge glow (thread-safe)."""
     global _scan_depth
+    r, g, b = accent_rgb if accent_rgb and len(accent_rgb) == 3 else (59, 130, 246)
     with _scan_depth_lock:
         _scan_depth += 1
         if _active_scan_overlay is not None:
             try:
-                _active_scan_overlay.signals.start_signal.emit(label)
+                _active_scan_overlay.signals.start_signal.emit(label, int(r), int(g), int(b))
             except Exception:
                 pass
+
+
+def update_screen_scan(
+    label: str = "",
+    accent_rgb: Optional[tuple] = None,
+    intensity: float = 1.25,
+    hotspot_x: float = 0.5,
+    hotspot_y: float = 0.5,
+):
+    """Reactively steer the edge glow color, energy, and spatial hotspot to live screen content."""
+    if _active_scan_overlay is not None:
+        r, g, b = accent_rgb if accent_rgb and len(accent_rgb) == 3 else (-1, -1, -1)
+        try:
+            _active_scan_overlay.signals.update_signal.emit(
+                label, int(r), int(g), int(b), float(intensity), float(hotspot_x), float(hotspot_y)
+            )
+        except Exception:
+            pass
 
 
 def stop_screen_scan():
@@ -309,8 +329,8 @@ def stop_screen_scan():
 class ScreenScanOverlay(QWidget):
     """
     Full-screen transparent click-through overlay shown during OCR & screen analysis.
-    Renders a glowing blue/indigo 4-edge vignette, subtle cyber dot-matrix,
-    a sweeping horizontal laser scanline, and a sleek bottom status capsule.
+    Renders a living, content-reactive 4-edge aura with smooth exponential grow/vanish,
+    traveling organic wave blooms, and a sleek bottom status capsule.
     """
 
     def __init__(self):
@@ -320,15 +340,28 @@ class ScreenScanOverlay(QWidget):
 
         self.signals = ScanSignals()
         self.signals.start_signal.connect(self._start_scan)
+        self.signals.update_signal.connect(self._update_scan)
         self.signals.stop_signal.connect(self._stop_scan)
 
         self._anim_timer = QTimer(self)
         self._anim_timer.timeout.connect(self._tick)
+        self._hold_timer = QTimer(self)
+        self._hold_timer.setSingleShot(True)
+        self._hold_timer.timeout.connect(self._on_hold_expired)
+        self._min_hold_ms = 2200
+        self._pending_stop = False
         self._time = 0.0
-        self._scan_y_ratio = 0.0
         self._opacity_factor = 0.0
         self._fading_out = False
         self._label = "T.U.E.S.D.A.Y Vision Scan"
+
+        # Living color & spatial reactivity (smoothly lerped)
+        self._curr_rgb = [59.0, 130.0, 246.0]
+        self._target_rgb = [59.0, 130.0, 246.0]
+        self._curr_intensity = 1.0
+        self._target_intensity = 1.0
+        self._curr_hotspot = [0.5, 0.5]
+        self._target_hotspot = [0.5, 0.5]
 
         self._setup_ui()
 
@@ -349,33 +382,66 @@ class ScreenScanOverlay(QWidget):
             self.setGeometry(screen.geometry())
         self.hide()
 
-    def _start_scan(self, label: str):
+    def _start_scan(self, label: str, r: int, g: int, b: int):
         self._label = label or "Scanning screen..."
         self._fading_out = False
-        self._opacity_factor = max(self._opacity_factor, 0.2)
+        self._pending_stop = False
+        self._opacity_factor = max(self._opacity_factor, 0.02)
+        self._target_rgb = [float(r), float(g), float(b)]
+        self._target_intensity = 1.0
+        self._hold_timer.start(self._min_hold_ms)
         screen = QApplication.primaryScreen()
         if screen:
             self.setGeometry(screen.geometry())
         self.show()
         if not self._anim_timer.isActive():
-            self._anim_timer.start(16)  # ~60 FPS smooth sweep
+            self._anim_timer.start(16)  # ~60 FPS organic motion
         self.update()
 
+    def _update_scan(self, label: str, r: int, g: int, b: int, intensity: float, hx: float, hy: float):
+        if label:
+            self._label = label
+        if r >= 0 and g >= 0 and b >= 0:
+            self._target_rgb = [float(r), float(g), float(b)]
+        self._target_intensity = max(0.6, min(1.8, intensity))
+        self._target_hotspot = [max(0.05, min(0.95, hx)), max(0.05, min(0.95, hy))]
+
     def _stop_scan(self):
-        self._fading_out = True
+        if self._hold_timer.isActive():
+            self._pending_stop = True
+        else:
+            self._fading_out = True
+
+    def _on_hold_expired(self):
+        if self._pending_stop:
+            self._pending_stop = False
+            self._fading_out = True
 
     def _tick(self):
-        self._time += 0.07
-        self._scan_y_ratio = (self._scan_y_ratio + 0.018) % 1.0
+        self._time += 0.038
+
+        # Smoothly lerp color, energy intensity, and content hotspot
+        for i in range(3):
+            self._curr_rgb[i] += (self._target_rgb[i] - self._curr_rgb[i]) * 0.08
+        self._curr_intensity += (self._target_intensity - self._curr_intensity) * 0.08
+        self._curr_hotspot[0] += (self._target_hotspot[0] - self._curr_hotspot[0]) * 0.07
+        self._curr_hotspot[1] += (self._target_hotspot[1] - self._curr_hotspot[1]) * 0.07
+        # Gently relax intensity back toward baseline 1.05
+        self._target_intensity += (1.05 - self._target_intensity) * 0.02
 
         if self._fading_out:
-            self._opacity_factor = max(0.0, self._opacity_factor - 0.12)
+            # Silky ~0.9s dissolve out
+            self._opacity_factor *= 0.92
             if self._opacity_factor <= 0.01:
+                self._opacity_factor = 0.0
                 self._anim_timer.stop()
                 self.hide()
                 return
         else:
-            self._opacity_factor = min(1.0, self._opacity_factor + 0.15)
+            # Silky ~0.7s bloom in
+            self._opacity_factor += (1.0 - self._opacity_factor) * 0.055
+            if self._opacity_factor > 0.995:
+                self._opacity_factor = 1.0
 
         self.update()
 
@@ -387,70 +453,67 @@ class ScreenScanOverlay(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
         w = self.width()
         h = self.height()
-        pulse = 0.78 + 0.22 * math.sin(self._time * 2.2)
-        alpha_scale = self._opacity_factor * pulse
 
-        # ── 1. 4-Edge Glowing Cyber Vignette ────────────────────────────────
-        edge_depth = 120
-        c_outer = QColor(59, 130, 246, int(115 * alpha_scale))   # Electric Blue
-        c_mid = QColor(99, 102, 241, int(45 * alpha_scale))      # Indigo glow
-        c_clear = QColor(59, 130, 246, 0)
+        r, g, b = int(self._curr_rgb[0]), int(self._curr_rgb[1]), int(self._curr_rgb[2])
+        # Secondary harmonic color (shifted toward cyan/indigo)
+        r2 = max(0, min(255, int(r * 0.6 + 40)))
+        g2 = max(0, min(255, int(g * 0.8 + 45)))
+        b2 = max(0, min(255, int(b * 0.7 + 75)))
 
-        # Top edge
-        g_top = QLinearGradient(0, 0, 0, edge_depth)
-        g_top.setColorAt(0.0, c_outer)
-        g_top.setColorAt(0.45, c_mid)
-        g_top.setColorAt(1.0, c_clear)
-        painter.fillRect(0, 0, w, edge_depth, g_top)
+        # Multi-wave organic breathing
+        wave = 0.78 + 0.14 * math.sin(self._time * 2.1) + 0.08 * math.cos(self._time * 3.7)
+        alpha_scale = min(1.35, self._opacity_factor * wave * self._curr_intensity)
 
-        # Bottom edge
-        g_bot = QLinearGradient(0, h, 0, h - edge_depth)
-        g_bot.setColorAt(0.0, c_outer)
-        g_bot.setColorAt(0.45, c_mid)
-        g_bot.setColorAt(1.0, c_clear)
-        painter.fillRect(0, h - edge_depth, w, edge_depth, g_bot)
+        # ── 1. Living 4-Edge Content-Reactive Vignette ──────────────────────
+        edge_depth = max(28, int((130 * self._opacity_factor * self._curr_intensity) + 16 * math.sin(self._time * 1.9)))
+        c_outer = QColor(r, g, b, min(210, int(120 * alpha_scale)))
+        c_mid = QColor(r2, g2, b2, min(140, int(48 * alpha_scale)))
+        c_clear = QColor(r, g, b, 0)
 
-        # Left edge
-        g_left = QLinearGradient(0, 0, edge_depth, 0)
-        g_left.setColorAt(0.0, c_outer)
-        g_left.setColorAt(0.45, c_mid)
-        g_left.setColorAt(1.0, c_clear)
-        painter.fillRect(0, 0, edge_depth, h, g_left)
+        for grad, rect in (
+            (QLinearGradient(0, 0, 0, edge_depth), (0, 0, w, edge_depth)),
+            (QLinearGradient(0, h, 0, h - edge_depth), (0, h - edge_depth, w, edge_depth)),
+            (QLinearGradient(0, 0, edge_depth, 0), (0, 0, edge_depth, h)),
+            (QLinearGradient(w, 0, w - edge_depth, 0), (w - edge_depth, 0, edge_depth, h)),
+        ):
+            grad.setColorAt(0.0, c_outer)
+            grad.setColorAt(0.45, c_mid)
+            grad.setColorAt(1.0, c_clear)
+            painter.fillRect(*rect, grad)
 
-        # Right edge
-        g_right = QLinearGradient(w, 0, w - edge_depth, 0)
-        g_right.setColorAt(0.0, c_outer)
-        g_right.setColorAt(0.45, c_mid)
-        g_right.setColorAt(1.0, c_clear)
-        painter.fillRect(w - edge_depth, 0, edge_depth, h, g_right)
+        # ── 2. Orbiting & Content-Attracted Radial Energy Blooms ────────────
+        hx = self._curr_hotspot[0] * w
+        hy = self._curr_hotspot[1] * h
+        # Project hotspot onto nearest perimeter + add organic drift
+        bloom_centers = [
+            (hx + 70 * math.sin(self._time * 1.4), 12 if hy < h * 0.5 else h - 12, 340),
+            (12 if hx < w * 0.5 else w - 12, hy + 70 * math.cos(self._time * 1.6), 300),
+            (w * (0.5 + 0.35 * math.sin(self._time * 0.9)), h - 10, 280),
+        ]
+        for bx, by, radius in bloom_centers:
+            rad = int(radius * (0.5 + 0.5 * self._opacity_factor))
+            rg = QRadialGradient(bx, by, max(40, rad))
+            rg.setColorAt(0.0, QColor(min(255, r + 45), min(255, g + 45), min(255, b + 45), min(190, int(110 * alpha_scale))))
+            rg.setColorAt(0.5, QColor(r2, g2, b2, min(110, int(40 * alpha_scale))))
+            rg.setColorAt(1.0, QColor(r, g, b, 0))
+            painter.fillRect(int(bx - rad), int(by - rad), rad * 2, rad * 2, rg)
 
         # Crisp neon perimeter border
-        border_pen = QPen(QColor(96, 165, 250, int(180 * alpha_scale)), 2)
+        border_pen = QPen(QColor(min(255, r + 40), min(255, g + 40), min(255, b + 40), min(220, int(180 * alpha_scale))), 2)
         painter.setPen(border_pen)
         painter.drawRect(1, 1, w - 2, h - 2)
 
-        # ── 2. Subtle Cyber Dot-Matrix Texture Near Perimeter ───────────────
-        dot_color = QColor(147, 197, 253, int(55 * alpha_scale))
+        # ── 3. Reactive Perimeter Dot-Matrix ────────────────────────────────
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QBrush(dot_color))
         step = 28
-        margin = 96
+        margin = max(24, int(edge_depth * 0.75))
+        base_dot_alpha = int(48 * alpha_scale)
+        dot_color = QColor(min(255, r + 80), min(255, g + 80), min(255, b + 80), min(150, base_dot_alpha))
+        painter.setBrush(QBrush(dot_color))
         for x in range(14, w, step):
             for y in range(14, h, step):
                 if x < margin or x > w - margin or y < margin or y > h - margin:
                     painter.drawEllipse(x, y, 2, 2)
-
-        # ── 3. Sweeping Horizontal Laser Scanline ───────────────────────────
-        scan_y = int(self._scan_y_ratio * h)
-        trail_h = 44
-        g_laser = QLinearGradient(0, scan_y - trail_h, 0, scan_y)
-        g_laser.setColorAt(0.0, QColor(56, 189, 248, 0))
-        g_laser.setColorAt(1.0, QColor(56, 189, 248, int(65 * alpha_scale)))
-        painter.fillRect(0, scan_y - trail_h, w, trail_h, g_laser)
-
-        laser_pen = QPen(QColor(56, 189, 248, int(190 * alpha_scale)), 2)
-        painter.setPen(laser_pen)
-        painter.drawLine(0, scan_y, w, scan_y)
 
         # ── 4. Bottom Floating Status Capsule ───────────────────────────────
         pill_w, pill_h = 310, 44
