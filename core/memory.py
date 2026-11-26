@@ -338,17 +338,17 @@ class MemoryStore:
 
     # ── Automatic Background Fact Extraction ──────────────────────────────
 
-    def auto_extract_facts_async(self, groq_client, model: str, recent_turns: List[Dict[str, str]]):
+    def auto_extract_facts_async(self, llm_client, model: str, recent_turns: List[Dict[str, str]]):
         """Asynchronously analyze dialogue turns to extract and store durable facts."""
         thread = threading.Thread(
             target=self._run_fact_extraction,
-            args=(groq_client, model, recent_turns),
+            args=(llm_client, model, recent_turns),
             daemon=True
         )
         thread.start()
 
-    def _run_fact_extraction(self, groq_client, model: str, recent_turns: List[Dict[str, str]]):
-        if not groq_client or len(recent_turns) < 2:
+    def _run_fact_extraction(self, llm_client, model: str, recent_turns: List[Dict[str, str]]):
+        if not llm_client or len(recent_turns) < 2:
             return
 
         dialogue_text = "\n".join([f"{t['role'].title()}: {t['content']}" for t in recent_turns])
@@ -365,7 +365,7 @@ class MemoryStore:
         )
 
         try:
-            res = groq_client.chat.completions.create(
+            res = llm_client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "system", "content": "You are a precise data extraction engine. Output JSON only."},

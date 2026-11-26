@@ -1,5 +1,5 @@
 """tests/test_universal_llm.py
-Unit tests for Universal LLM provider integration (Groq, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio).
+Unit tests for Universal LLM provider integration (Cloud, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio).
 """
 
 import sys
@@ -26,7 +26,7 @@ class TestUniversalLLMClient:
     """Test universal LLM client across providers and schemas."""
 
     def test_provider_presets_exist(self):
-        expected_providers = ["groq", "openai", "openrouter", "deepseek", "ollama", "lmstudio"]
+        expected_providers = ["cloud", "openai", "openrouter", "deepseek", "ollama", "lmstudio"]
         for p in expected_providers:
             assert p in PROVIDER_PRESETS
             assert "base_url" in PROVIDER_PRESETS[p]

@@ -76,7 +76,7 @@ class Tool:
         }
 
     def to_openai_schema(self) -> Dict[str, Any]:
-        """Convert to OpenAI / Groq function-calling tool schema."""
+        """Convert to OpenAI / Universal LLM function-calling tool schema."""
         schema = self.params_schema
         # Auto-wrap flat property dicts into valid JSON Schema objects.
         # Many tools define params_schema as {"title": {...}, "content": {...}}
@@ -172,7 +172,7 @@ def list_tools() -> List[Tool]:
 
 
 def get_tool_schemas() -> List[Dict[str, Any]]:
-    """Return all tool schemas formatted for Groq / OpenAI function calling."""
+    """Return all tool schemas formatted for Universal LLM / OpenAI function calling."""
     return [t.to_openai_schema() for t in TOOL_REGISTRY.values()]
 
 

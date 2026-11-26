@@ -103,7 +103,7 @@ class SentenceChunker:
 
 
 class AIBrain:
-    """Universal AI Brain supporting any LLM provider (Groq, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio)."""
+    """Universal AI Brain supporting any LLM provider (OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio, Cloud)."""
 
     def __init__(self):
         self.api_key = Config.LLM_API_KEY
@@ -193,7 +193,7 @@ class AIBrain:
 
             if active_ids:
                 sorted_models = []
-                preferred_default = self.client.default_model or Config.GROQ_MODEL
+                preferred_default = self.client.default_model or Config.LLM_MODEL
                 if preferred_default in active_ids:
                     sorted_models.append(preferred_default)
 
@@ -214,7 +214,7 @@ class AIBrain:
     def current_model(self) -> str:
         if 0 <= self.current_model_index < len(self.available_models):
             return self.available_models[self.current_model_index]
-        return self.client.default_model or Config.GROQ_MODEL
+        return self.client.default_model or Config.LLM_MODEL
 
     def _switch_to_next_model(self) -> Optional[str]:
         """Advance to next fallback model."""
@@ -244,7 +244,7 @@ class AIBrain:
         1. Checks safety confirmation gate
         2. Evaluates memory commands (remember, forget, recall)
         3. Semantic memory search and live web injection
-        4. Multi-hop Groq tool execution loop with Real-Time Streaming TTS
+        4. Multi-hop tool execution loop with Real-Time Streaming TTS
         5. Synthesizes clean Hinglish dialogue without JSON leaks
         6. Asynchronous durable-fact extraction
         """
@@ -403,7 +403,7 @@ class AIBrain:
         # ── 5. Agent Loop with AI Tool Calling & Streaming Output ─────────
         while hop < max_hops:
             hop += 1
-            response = self._call_groq_with_fallback(messages, tools=tools_schema)
+            response = self._call_llm_with_fallback(messages, tools=tools_schema)
             if not response:
                 final_reply = "Mujhe samajh nahi aaya ya connection issue ho gaya tha, Sir. Ek baar fir se bolna?"
                 if on_sentence:
@@ -509,14 +509,6 @@ class AIBrain:
                     break
 
         return None
-
-    def _call_groq_with_fallback(
-        self,
-        messages: List[Dict[str, Any]],
-        tools: Optional[List[Dict[str, Any]]] = None,
-    ) -> Optional[Any]:
-        """Backward compatibility method for Groq fallback calls."""
-        return self._call_llm_with_fallback(messages, tools)
 
     def _record_dialogue(self, user_text: str, reply_text: str):
         """Persist turn to SQLite database and ChromaDB vector index.

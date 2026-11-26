@@ -501,7 +501,7 @@ def open_file(file_path: str) -> str:
     risk="low",
 )
 def summarize_file(file_path: str) -> str:
-    """Read document and summarize using Groq."""
+    """Read document and summarize using Universal LLM."""
     content = read_file_content(file_path, max_chars=6000)
     if content.startswith("File nahi mili") or content.startswith("Error"):
         return content

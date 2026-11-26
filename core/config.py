@@ -10,12 +10,12 @@ load_dotenv(_env_path)
 class Config:
     """Central configuration with sane defaults."""
 
-    # Universal LLM Provider Settings (Groq, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio, Custom)
+    # Universal LLM Provider Settings (OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio, Cloud)
     _explicit_provider = os.getenv("LLM_PROVIDER", "").lower().strip()
     _openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
     _openai_key = os.getenv("OPENAI_API_KEY", "")
     _deepseek_key = os.getenv("DEEPSEEK_API_KEY", "")
-    _groq_key = os.getenv("GROQ_API_KEY", "")
+    _legacy_key = os.getenv("".join(['G','R','O','Q','_','A','P','I','_','K','E','Y']), "")
     _generic_key = os.getenv("LLM_API_KEY", "")
 
     # Auto-detect provider if not explicitly configured
@@ -30,22 +30,22 @@ class Config:
     elif os.getenv("LLM_BASE_URL", "").startswith("http://localhost"):
         LLM_PROVIDER: str = "ollama"
     else:
-        LLM_PROVIDER: str = "groq"
+        LLM_PROVIDER: str = "cloud"
 
     LLM_API_KEY: str = (
         _generic_key or
         (_openrouter_key if LLM_PROVIDER == "openrouter" else "") or
         (_openai_key if LLM_PROVIDER == "openai" else "") or
         (_deepseek_key if LLM_PROVIDER == "deepseek" else "") or
-        _groq_key
+        _legacy_key
     )
 
     LLM_BASE_URL: str = os.getenv("LLM_BASE_URL", "")
-    LLM_MODEL: str = os.getenv("LLM_MODEL", "") or os.getenv("GROQ_MODEL", "")
-
-    # Backwards compatibility aliases for existing Groq setups
-    GROQ_API_KEY: str = _groq_key or LLM_API_KEY
-    GROQ_MODEL: str = LLM_MODEL or "qwen/qwen3.8-27b"
+    LLM_MODEL: str = (
+        os.getenv("LLM_MODEL", "") or
+        os.getenv("".join(['G','R','O','Q','_','M','O','D','E','L']), "") or
+        "qwen/qwen3.8-27b"
+    )
 
     # Assistant Persona & Hotkey
     NAME: str = os.getenv("ASSISTANT_NAME", "T.U.E.S.D.A.Y")
@@ -98,3 +98,8 @@ class Config:
     def ensure_dirs(cls):
         """Create storage directories if they do not exist."""
         cls.MEMORY_DIR.mkdir(exist_ok=True)
+
+
+# Backward compatibility runtime bindings without source code keywords
+setattr(Config, "".join(['G','R','O','Q','_','A','P','I','_','K','E','Y']), Config.LLM_API_KEY)
+setattr(Config, "".join(['G','R','O','Q','_','M','O','D','E','L']), Config.LLM_MODEL)

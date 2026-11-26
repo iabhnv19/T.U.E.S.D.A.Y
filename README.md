@@ -14,7 +14,7 @@ A voice-activated AI desktop assistant for Windows, combining natural Hinglish c
 ![Language](https://img.shields.io/badge/language-Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Interface](https://img.shields.io/badge/interface-PyQt5-41CD52?style=for-the-badge&logo=qt&logoColor=white)
 ![Voice](https://img.shields.io/badge/Voice-Edge--TTS%20Neural-00B4D8?style=for-the-badge)
-![AI](https://img.shields.io/badge/AI-Universal%20LLM%20(Groq%2FOpenAI%2FLocal)-F55036?style=for-the-badge)
+![AI](https://img.shields.io/badge/AI-Universal%20LLM%20(Cloud%2FOpenAI%2FLocal)-F55036?style=for-the-badge)
 ![Architecture](https://img.shields.io/badge/architecture-Autonomous%20ReAct-6C5CE7?style=for-the-badge)
 ![Multi-Agent](https://img.shields.io/badge/agents-Specialist%20Swarm-blueviolet?style=for-the-badge)
 ![Overlay](https://img.shields.io/badge/overlay-Living%20Cyber%20Scan-0984e3?style=for-the-badge)
@@ -27,7 +27,7 @@ A voice-activated AI desktop assistant for Windows, combining natural Hinglish c
 
 A desktop assistant should do more than answer questions. It should understand a request, interact with the operating system, work with files and applications, remember useful context, anticipate your needs proactively, and get out of the way when it is not needed.
 
-T.U.E.S.D.A.Y is a lightweight, voice-first Windows assistant built around that idea. It combines a fast local command parser for common actions with an **Autonomous ReAct Planner**, a **Specialist Multi-Agent Swarm** (Researcher, Analyst, Writer), a **Proactive Ambient Companion**, and a **Universal LLM AI agent** (supporting Groq, OpenAI, OpenRouter, DeepSeek, and local Ollama/LM Studio models). Its interface pairs a floating Dynamic Island capsule with a **Living Cyber Screen Scan Overlay**, while its speech layer delivers **Real-Time Streaming Neural Speech** via Microsoft Edge-TTS with Indian English and Hindi support.
+T.U.E.S.D.A.Y is a lightweight, voice-first Windows assistant built around that idea. It combines a fast local command parser for common actions with an **Autonomous ReAct Planner**, a **Specialist Multi-Agent Swarm** (Researcher, Analyst, Writer), a **Proactive Ambient Companion**, and a **Universal LLM AI agent** (supporting Cloud, OpenAI, OpenRouter, DeepSeek, and local Ollama/LM Studio models). Its interface pairs a floating Dynamic Island capsule with a **Living Cyber Screen Scan Overlay**, while its speech layer delivers **Real-Time Streaming Neural Speech** via Microsoft Edge-TTS with Indian English and Hindi support.
 
 The interaction loop is designed to stay simple:
 
@@ -49,7 +49,7 @@ Common commands are handled locally without an LLM round trip. Multi-step workfl
 |---|---|
 | Voice interaction | Continuous speech input with real-time streaming neural speech (~0.3s start) |
 | Local command routing | Regex-based command parser with conversational normalizer & fuzzy matching |
-| Universal AI agent | Multi-provider LLM support (Groq, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio) |
+| Universal AI agent | Multi-provider LLM support (Cloud, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio) |
 | Autonomous ReAct Planner | Multi-step goal decomposition, tool execution chaining, thought loop & self-correction |
 | Specialist Multi-Agent Swarm | Parallel research fan-out, technical spec comparison, and crisp synthesis |
 | Proactive Ambient Companion | Low-overhead (<1% CPU) background health, fatigue, battery, and schedule monitor |
@@ -203,8 +203,8 @@ Common commands are handled locally without an LLM round trip. Multi-step workfl
 - Windows 10 or Windows 11
 - Python 3.10 or newer
 - A working microphone and audio output device
-- Internet connection for Groq-powered conversations and online services
-- A Groq API key for AI conversation and tool-calling features
+- Internet connection for AI conversations and online services
+- An AI API key for conversation and tool-calling features (Cloud, OpenAI, OpenRouter, DeepSeek, or local Ollama)
 
 Some capabilities depend on Windows APIs, installed applications, optional services, and their corresponding configuration.
 
@@ -231,10 +231,12 @@ Create your local `.env` file from the example:
 copy .env.example .env
 ```
 
-Open `.env` and add your Groq API key:
+Open `.env` and add your LLM API credentials:
 
 ```env
-GROQ_API_KEY=gsk_your_groq_api_key_here
+LLM_PROVIDER=cloud
+LLM_API_KEY=your_api_key_here
+LLM_MODEL=openai/gpt-oss-120b
 ```
 
 Do not commit `.env` or publish API keys. The `.env.example` file is intended to contain placeholders only.
@@ -253,10 +255,10 @@ The following settings are documented by the project:
 
 | Variable | Default | Description |
 |---|---|---|
-| `GROQ_API_KEY` | Not set | API key used for Groq-powered AI conversations |
-| `LLM_PROVIDER` | `groq` | Active AI provider (`groq`, `openai`, `openrouter`, `deepseek`, `ollama`, `lmstudio`) |
+| `LLM_PROVIDER` | `cloud` | Active AI provider (`cloud`, `openai`, `openrouter`, `deepseek`, `ollama`, `lmstudio`) |
 | `LLM_API_KEY` | Not set | Universal API key for the selected AI provider |
 | `LLM_MODEL` | Provider default | Default model (e.g. `openai/gpt-oss-120b`, `gpt-4o-mini`, `llama3.2`) |
+| `LLM_BASE_URL` | Provider default | Custom OpenAI-compatible endpoint URL (optional) |
 | `TTS_ENGINE` | `edge-tts` | Primary voice engine (`edge-tts`, `gtts`, `pyttsx3`, `auto`) |
 | `EDGE_VOICE_EN` | `en-IN-NeerjaNeural` | Microsoft Neural voice for English / Hinglish speech |
 | `EDGE_VOICE_HI` | `hi-IN-SwaraNeural` | Microsoft Neural voice for Hindi speech |
@@ -309,26 +311,115 @@ T.U.E.S.D.A.Y uses a hybrid intelligence architecture. Fast commands execute loc
 
 ```mermaid
 flowchart TD
-    A["Global hotkey<br/>Right Shift + Enter"] --> B["Voice input<br/>SpeechRecognition (en-IN / hi-IN)"]
-    B --> C["Command parser<br/>Regex + rapidfuzz"]
-    C -->|Local match| D["Registered @tool"]
-    C -->|No local match| M_ENG["MoodEngine<br/>Sentiment & time-of-day tone"]
-    M_ENG --> ROUTE{"Goal Classifier"}
-    ROUTE -->|Multi-step goal| PLAN["ReAct Planner<br/>Decompose & self-correct"]
-    ROUTE -->|Deep research query| SWARM["Specialist Swarm<br/>Researcher + Analyst + Writer"]
-    ROUTE -->|Standard interaction| BRAIN["AI Brain<br/>Universal LLM Loop"]
-    PLAN --> G["Tool registry"]
-    BRAIN --> G
-    G --> H["Windows / Screen / Files / Browser / Memory / Productivity"]
-    H -->|OCR / Screen Analysis| SCAN["ScreenScanOverlay<br/>Living cyber edge glow"]
-    D --> I["Execution Result"]
-    H --> I
-    SWARM --> I
-    I --> J["Natural-language response"]
-    J --> K["Streaming Edge-TTS<br/>en-IN-Neerja / hi-IN-Swara"]
-    K --> L["Dynamic Island overlay<br/>Capsule + ribbon wave"]
-    K --> M["Barge-in listener<br/>'Tuesday stop/chup'"]
-    M --> B
+
+subgraph group_interaction["Voice and Interface"]
+  node_app["Assistant Runtime<br/>[main.py]"]
+  node_voice["Speech I/O<br/>[voice.py]"]
+  node_overlay["Floating Overlays<br/>[overlay.py]"]
+end
+
+subgraph group_reasoning["Reasoning and Agents"]
+  node_parser["Command Parser<br/>[command_parser.py]"]
+  node_brain["AI Brain<br/>[brain.py]"]
+  node_planner["ReAct Planner<br/>[planner.py]"]
+  node_agents["Specialist Swarm<br/>[agents.py]"]
+  node_llm["Universal LLM<br/>[llm.py]"]
+  node_mood["Mood Engine<br/>[mood.py]"]
+end
+
+subgraph group_actions["Tools and Automation"]
+  node_tool_dispatch["Tool Registry and Safety<br/>[tools.py]"]
+  node_registered["Desktop Action Tools"]
+  node_pc["Windows Control<br/>[pc_control.py]"]
+  node_utilities["System Utilities<br/>[utilities.py]"]
+  node_screen["Screen Understanding<br/>[screen_tools.py]"]
+  node_browser["Browser Operations<br/>[browser_tools.py]"]
+  node_files["File Operations<br/>[file_tools.py]"]
+  node_web["Web Search<br/>[web_search.py]"]
+end
+
+subgraph group_context["Memory and Productivity"]
+  node_productivity["Productivity Tools"]
+  node_memory[("Persistent Memory<br/>[memory.py]")]
+end
+
+subgraph group_proactive["Proactive Support"]
+  node_scheduler["Reminder Scheduler<br/>[scheduler.py]"]
+  node_ambient["Ambient Companion<br/>[ambient.py]"]
+end
+
+node_user(("Desktop User"))
+node_external_services{{"AI and Web Services"}}
+
+node_user -->|"activates"| node_app
+node_app -->|"captures speech"| node_voice
+node_voice -->|"transcribes"| node_app
+node_app -->|"routes requests"| node_brain
+node_app -->|"routes commands"| node_parser
+node_parser -->|"executes direct tools"| node_tool_dispatch
+node_brain -->|"delegates goals"| node_planner
+node_brain -->|"delegates research"| node_agents
+node_brain -->|"requests completions"| node_llm
+node_planner -->|"generates plans"| node_llm
+node_brain -->|"adapts tone"| node_mood
+node_brain -->|"reads and records"| node_memory
+node_agents -->|"researches with"| node_web
+node_brain -->|"invokes tools"| node_tool_dispatch
+node_planner -->|"executes steps"| node_tool_dispatch
+node_tool_dispatch -->|"loads tool set"| node_registered
+node_registered -->|"delegates control"| node_pc
+node_registered -->|"uses utilities"| node_utilities
+node_registered -->|"uses search"| node_web
+node_registered -->|"uses stored context"| node_memory
+node_brain -->|"uses screen tools"| node_screen
+node_brain -->|"uses browser tools"| node_browser
+node_brain -->|"uses file tools"| node_files
+node_productivity -->|"stores reminders and notes"| node_memory
+node_app -->|"starts scheduler"| node_scheduler
+node_scheduler -->|"reads reminders"| node_memory
+node_app -->|"starts monitor"| node_ambient
+node_ambient -->|"uses memory"| node_memory
+node_app -->|"updates interface"| node_overlay
+node_brain -->|"streams response"| node_voice
+node_llm -->|"calls providers"| node_external_services
+node_web -->|"queries online sources"| node_external_services
+node_productivity -.->|"optionally accesses Workspace"| node_external_services
+node_voice -.->|"optionally uses speech services"| node_external_services
+
+click node_app "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/main.py"
+click node_voice "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/core/voice.py"
+click node_overlay "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/modules/overlay.py"
+click node_parser "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/modules/command_parser.py"
+click node_brain "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/core/brain.py"
+click node_planner "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/core/planner.py"
+click node_agents "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/core/agents.py"
+click node_llm "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/core/llm.py"
+click node_mood "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/core/mood.py"
+click node_tool_dispatch "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/core/tools.py"
+click node_registered "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/modules/registered_tools.py"
+click node_pc "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/modules/pc_control.py"
+click node_utilities "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/modules/utilities.py"
+click node_screen "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/modules/screen_tools.py"
+click node_browser "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/modules/browser_tools.py"
+click node_files "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/modules/file_tools.py"
+click node_web "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/modules/web_search.py"
+click node_productivity "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/modules/productivity_tools.py"
+click node_memory "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/core/memory.py"
+click node_scheduler "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/core/scheduler.py"
+click node_ambient "https://github.com/iabhnv19/t.u.e.s.d.a.y/blob/main/core/ambient.py"
+
+classDef toneNeutral fill:#f8fafc,stroke:#334155,stroke-width:1.5px,color:#0f172a
+classDef toneBlue fill:#dbeafe,stroke:#2563eb,stroke-width:1.5px,color:#172554
+classDef toneAmber fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
+classDef toneMint fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
+classDef toneRose fill:#ffe4e6,stroke:#e11d48,stroke-width:1.5px,color:#881337
+classDef toneIndigo fill:#e0e7ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81
+classDef toneTeal fill:#ccfbf1,stroke:#0f766e,stroke-width:1.5px,color:#134e4a
+class node_app,node_voice,node_overlay,node_user toneBlue
+class node_parser,node_brain,node_planner,node_agents,node_llm,node_mood toneAmber
+class node_tool_dispatch,node_registered,node_pc,node_utilities,node_screen,node_browser,node_files,node_web toneMint
+class node_productivity,node_memory toneRose
+class node_scheduler,node_ambient,node_external_services toneIndigo
 ```
 
 ### Main responsibilities
@@ -337,12 +428,12 @@ flowchart TD
 |---|---|
 | `main.py` | Application entry point, Qt application lifecycle, global hotkey, listening and barge-in coordination |
 | `core/config.py` | Environment loading, central configuration, and assistant system prompt |
-| `core/brain.py` | AI agent loop, Groq/OpenAI model fallback, tool orchestration, and memory integration |
+| `core/brain.py` | AI agent loop, multi-model fallback, tool orchestration, and memory integration |
 | `core/planner.py` | Autonomous ReAct Planner for multi-step goal decomposition, tool chaining, and self-correction |
 | `core/agents.py` | Specialist Multi-Agent Swarm (Researcher, Analyst, Writer) for deep research and synthesis |
 | `core/ambient.py` | Proactive Ambient Intelligence companion monitoring ergonomics, battery, RAM, and habits (<1% CPU) |
 | `core/mood.py` | Mood-Adaptive Personality Engine tracking sentiment, stress, and time-of-day conversational tone |
-| `core/llm.py` | Universal LLM Client supporting Groq, OpenAI, OpenRouter, DeepSeek, Ollama, and LM Studio |
+| `core/llm.py` | Universal LLM Client supporting Cloud, OpenAI, OpenRouter, DeepSeek, Ollama, and LM Studio |
 | `core/memory.py` | SQLite persistence (facts, turns, reminders, todos, notes, moods) and ChromaDB semantic memory |
 | `core/scheduler.py` | Background reminder scheduler |
 | `core/tools.py` | Decorator-based tool registry, schemas, safety gate, confirmation manager, and undo journal |
@@ -408,7 +499,7 @@ T.U.E.S.D.A.Y/
 │   ├── agents.py                # Specialist Multi-Agent Swarm (Researcher, Analyst, Writer)
 │   ├── ambient.py               # Proactive Ambient Companion (background health, habits & fatigue)
 │   ├── mood.py                  # Mood-Adaptive Personality Engine (real-time sentiment & time-of-day tone)
-│   ├── llm.py                   # Universal LLM Client (Groq, OpenAI, OpenRouter, DeepSeek, Ollama)
+│   ├── llm.py                   # Universal LLM Client (Cloud, OpenAI, OpenRouter, DeepSeek, Ollama)
 │   ├── memory.py                # SQLite (facts, turns, reminders, todos, notes, moods) & ChromaDB
 │   ├── scheduler.py             # Background reminder scheduler
 │   ├── tools.py                 # Tool registry and safety mechanisms
@@ -479,7 +570,7 @@ Some tests exercise Windows-specific functionality or optional integrations. The
 |---|---|
 | Python | Application logic and orchestration |
 | PyQt5 | Floating desktop overlay |
-| Groq API | LLM inference and function calling |
+| Cloud / Local LLM | AI inference and function calling |
 | SpeechRecognition | Microphone input and speech-to-text |
 | gTTS | Online text-to-speech |
 | pygame | Audio playback |
@@ -496,9 +587,9 @@ Some tests exercise Windows-specific functionality or optional integrations. The
 ## Troubleshooting
 
 <details>
-<summary><strong>Groq requests fail or return rate-limit errors</strong></summary>
+<summary><strong>AI API requests fail or return rate-limit errors</strong></summary>
 
-Check that `GROQ_API_KEY` is present in `.env` and that the key is valid. The agent has a model fallback mechanism for rate limits, but all available models can still be unavailable or restricted by account limits.
+Check that `LLM_API_KEY` is present in `.env` and that the key is valid. The agent has a model fallback mechanism for rate limits, but all available models can still be unavailable or restricted by account limits.
 
 </details>
 
@@ -545,7 +636,7 @@ These integrations are optional and require their corresponding configuration an
 
 - T.U.E.S.D.A.Y is designed for Windows and relies on Windows-specific APIs and automation libraries.
 - AI conversations and several online services require internet access.
-- Groq availability, model limits, and API behavior can change independently of the project.
+- Cloud AI availability, provider model limits, and API behavior can change independently of the project.
 - Screen analysis, OCR, and UI automation depend on the active application and accessible controls.
 - Browser automation behavior can vary across websites and their layouts.
 - Google Workspace functionality requires optional OAuth configuration.

@@ -49,7 +49,7 @@ def test_registry_discovery():
 
 
 def test_tool_schema_generation():
-    """Verify tool schemas follow OpenAI / Groq function-calling specification."""
+    """Verify tool schemas follow OpenAI function-calling specification."""
     schemas = get_tool_schemas()
     assert isinstance(schemas, list)
     assert len(schemas) > 0
@@ -136,7 +136,7 @@ def test_command_parser_direct_routing():
     assert "Python GC" in res
 
 
-def test_agent_loop_with_mock_groq():
+def test_agent_loop_with_mock_llm():
     """Verify brain agent loop processes tool_calls and returns synthesized reply."""
     brain = AIBrain()
 
@@ -159,7 +159,7 @@ def test_agent_loop_with_mock_groq():
     mock_resp_step2 = MagicMock()
     mock_resp_step2.choices = [mock_choice_step2]
 
-    with patch.object(brain, "_call_groq_with_fallback", side_effect=[mock_resp_step1, mock_resp_step2]):
+    with patch.object(brain, "_call_llm_with_fallback", side_effect=[mock_resp_step1, mock_resp_step2]):
         reply = brain.think("7 multiplied by 8 kitna hoga?")
         assert "56" in reply
         assert "Bhai" in reply

@@ -43,7 +43,7 @@ TUESDAY_ASCII_BANNER = r"""
 
 
 class Tuesday:
-    """Core orchestrator tying together voice, PC control, Groq brain, and overlay."""
+    """Core orchestrator tying together voice, PC control, AI brain, and overlay."""
 
     def __init__(self):
         print("\033[96m" + TUESDAY_ASCII_BANNER + "\033[0m")
@@ -216,7 +216,7 @@ class Tuesday:
                     print(f"  {Config.NAME} [local]: {response}")
                     interrupted_text = self._speak_with_bargein(response)
                 else:
-                    # Pass through to Groq agentic brain with Real-Time Streaming TTS
+                    # Pass through to agentic brain with Real-Time Streaming TTS
                     self.voice.start_speech_stream()
 
                     def _on_chunk(sentence_chunk: str):

@@ -10,7 +10,7 @@
 - **Role**: Lightweight, proactive, Windows desktop voice assistant inspired by Friday/JARVIS.
 - **Persona**: Female voice, sharp, witty, warm, conversational Hinglish (Hindi + English) speaker. Strict no-emoji rule and tight natural punctuation cadence.
 - **User Gender**: Male, addressed respectfully as 'Sir' or 'Boss' (`karoge`, `aap sunao`, `Sir`, `Boss`). Strict ban on 'bhai'.
-- **Core Loop**: Global Hotkey (`Right Shift + Enter`) → Continuous Active Listening until 5s silence → Local Regex Command Parser (Zero API Latency) → Autonomous ReAct Planner / Universal LLM Brain with tool-calling agent loop (Groq, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio) → Specialist Multi-Agent Swarm (Research, Analysis, Writing) → Mood-Adaptive Personality Engine (real-time sentiment & time-of-day shifting) → Real-Time Streaming Neural Voice (Edge-TTS `en-IN-NeerjaNeural` / `hi-IN-SwaraNeural`) with instant mid-generation playback (~0.3s start) and real-time Barge-In cancellation → Floating OLED Dynamic Island Overlay UI & Living Cyber ScreenScanOverlay.
+- **Core Loop**: Global Hotkey (`Right Shift + Enter`) → Continuous Active Listening until 5s silence → Local Regex Command Parser (Zero API Latency) → Autonomous ReAct Planner / Universal LLM Brain with tool-calling agent loop (Cloud, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio) → Specialist Multi-Agent Swarm (Research, Analysis, Writing) → Mood-Adaptive Personality Engine (real-time sentiment & time-of-day shifting) → Real-Time Streaming Neural Voice (Edge-TTS `en-IN-NeerjaNeural` / `hi-IN-SwaraNeural`) with instant mid-generation playback (~0.3s start) and real-time Barge-In cancellation → Floating OLED Dynamic Island Overlay UI & Living Cyber ScreenScanOverlay.
 - **Background Intelligence**: Proactive Ambient Companion (<1% CPU idle/habit/health monitor) + Background Reminder Scheduler.
 
 ---
@@ -35,7 +35,7 @@ E:\T.U.E.S.D.A.Y\
 │   ├── agents.py            # Specialist Multi-Agent Swarm: ResearcherAgent, AnalystAgent, WriterAgent
 │   ├── ambient.py           # Proactive Ambient Companion: background idle, health, fatigue & habit monitor
 │   ├── mood.py              # Mood-Adaptive Personality Engine: real-time sentiment scoring & time-of-day shifts
-│   ├── llm.py               # Universal LLM Client: Groq, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio + token streaming
+│   ├── llm.py               # Universal LLM Client: Cloud, OpenAI, OpenRouter, DeepSeek, Ollama, LM Studio + token streaming
 │   ├── memory.py            # MemoryStore: SQLite facts/turns/reminders/todos/notes/moods + ChromaDB
 │   ├── scheduler.py         # BackgroundScheduler thread checking due reminders & triggering alerts
 │   ├── tools.py             # Decorator-based @tool registry, schema auto-normalizer, safety gate & undo journal
@@ -118,7 +118,7 @@ E:\T.U.E.S.D.A.Y\
                  │                      ├── NO  -> Pure Chat Mode (tools=None)
                  │                      │          ~150 tokens, instant ~200ms reply
                  │                      └── YES -> Attach Tool Schemas
-                 │                                 Multi-hop Groq/OpenAI agent loop
+                 │                                 Multi-hop AI agent loop
                  │                                │
                  │                     Screen Analysis / OCR triggered?
                  │                      └── YES -> modules/overlay.py (ScreenScanOverlay)
@@ -231,7 +231,7 @@ E:\T.U.E.S.D.A.Y\
 | *"Read file <path>"*, *"File padho <x>"* | `read_file_content` | Reads text, code, PDF, or Word document up to 4000 characters. |
 | *"Read PDF <path>"* | `read_pdf` | Extracts clean text page-by-page using PyPDF2 / pypdf. |
 | *"Read docx <path>"* | `read_docx` | Extracts paragraphs and tables from Word documents via `python-docx`. |
-| *"Summarize file <path>"* | `summarize_file` | Extracts document text and uses Groq to produce a 3-5 bullet point Hinglish executive summary. |
+| *"Summarize file <path>"* | `summarize_file` | Extracts document text and uses Universal LLM to produce a 3-5 bullet point Hinglish executive summary. |
 | *"Create file <path> with <content>"* | `create_file` | Creates text file and parent folders automatically. |
 | *"Move file <src> to <dest>"* | `move_file` | Moves file or directory and logs operation to undo journal. |
 | *"Rename file <path> to <new_name>"* | `rename_file` | Renames file and logs operation to undo journal. |
@@ -325,7 +325,7 @@ E:\T.U.E.S.D.A.Y\
 
 ## 5. Tool-Calling Architecture & Safety Protocol
 
-T.U.E.S.D.A.Y utilizes an OpenAI/Groq function-calling tool registry (`core/tools.py`). Actions are declared using the `@tool` decorator:
+T.U.E.S.D.A.Y utilizes an OpenAI-compatible function-calling tool registry (`core/tools.py`). Actions are declared using the `@tool` decorator:
 
 ```python
 @tool(
@@ -356,7 +356,7 @@ def open_app(app_name: str) -> str:
 ## 6. Universal LLM Providers & Fallback Chain
 
 The assistant connects to any AI provider via `core/llm.py` (`UniversalLLMClient`):
-- **Groq** (Primary ultra-fast default: `openai/gpt-oss-120b`, fallback to `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`)
+- **Cloud (Default)** (Primary ultra-fast cloud tier: `openai/gpt-oss-120b`, fallback to `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`)
 - **OpenAI** (`gpt-4o-mini`, `gpt-4o`, `gpt-3.5-turbo`)
 - **OpenRouter** (Claude, Gemini, Llama, DeepSeek via unified gateway)
 - **DeepSeek** (`deepseek-chat`, `deepseek-reasoner`)

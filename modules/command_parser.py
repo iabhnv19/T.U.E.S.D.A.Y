@@ -649,7 +649,7 @@ class CommandParser:
 
     def try_parse(self, text: str) -> Optional[str]:
         """
-        Check for direct commands before hitting Groq API.
+        Check for direct commands before hitting AI API.
         Executes registered @tool actions directly on match.
         """
         clean = text.lower().strip()

@@ -76,7 +76,7 @@ def test_chromadb_semantic_search(setup_memory):
     """Verify semantic search retrieves relevant dialogue turns."""
     store = setup_memory
 
-    store.add_turn("user", "We decided to build the voice assistant using PyQt5 and Groq.")
+    store.add_turn("user", "We decided to build the voice assistant using PyQt5 and Python.")
     store.add_turn("assistant", "Understood, PyQt5 will give us an OLED Dynamic Island overlay.")
 
     result = store.search_memory("What UI framework are we using for the assistant?", limit=2)
@@ -118,7 +118,7 @@ def test_profile_summary_in_brain(setup_memory):
 def test_privacy_guard_in_auto_extraction():
     """Verify fact extraction prompts strictly forbid sensitive credentials."""
     store = MemoryStore()
-    mock_groq = MagicMock()
+    mock_llm = MagicMock()
 
     # Pass dialogue containing sensitive data
     turns = [
@@ -127,8 +127,8 @@ def test_privacy_guard_in_auto_extraction():
     ]
 
     # Verify extraction method runs safely without throwing exceptions
-    store._run_fact_extraction(mock_groq, "openai/gpt-oss-20b", turns)
-    assert mock_groq.chat.completions.create.called
-    call_args = mock_groq.chat.completions.create.call_args[1]
+    store._run_fact_extraction(mock_llm, "openai/gpt-oss-20b", turns)
+    assert mock_llm.chat.completions.create.called
+    call_args = mock_llm.chat.completions.create.call_args[1]
     prompt = call_args["messages"][1]["content"]
     assert "NEVER extract passwords, API keys, credit cards" in prompt
