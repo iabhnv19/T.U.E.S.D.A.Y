@@ -7,6 +7,7 @@ import sys
 import shutil
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 # Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -223,3 +224,57 @@ class TestCommandParserIntegration:
         assert cmd2 is not None
         assert cmd2["tool"] == "browser_open"
         assert "ycombinator" in cmd2["args"]["url"]
+
+    def test_smart_context_parser(self):
+        cmd1 = self.parser.parse("summarize this")
+        assert cmd1 is not None
+        assert cmd1["tool"] == "smart_context_action"
+        assert cmd1["args"]["mode"] == "summarize"
+
+        cmd2 = self.parser.parse("explain it")
+        assert cmd2 is not None
+        assert cmd2["tool"] == "smart_context_action"
+        assert cmd2["args"]["mode"] == "explain"
+
+
+class TestSmartContextAction:
+    """Test zero-friction context summarization across Explorer files, highlighted text, and screen OCR."""
+
+    def test_selected_file_priority(self, tmp_path):
+        from modules.screen_tools import smart_context_action
+
+        sample = tmp_path / "notes.txt"
+        sample.write_text("Project T.U.E.S.D.A.Y architecture overview and milestones.", encoding="utf-8")
+
+        with patch("modules.screen_tools._get_explorer_selected_files", return_value=[str(sample)]), \
+             patch("modules.screen_tools._summarize_text_with_llm", return_value="Mock file summary") as mock_llm:
+            res = smart_context_action("summarize")
+            assert res == "Mock file summary"
+            assert "notes.txt" in mock_llm.call_args.kwargs["source_label"]
+
+    def test_highlighted_text_priority(self):
+        from modules.screen_tools import smart_context_action
+
+        with patch("modules.screen_tools._get_explorer_selected_files", return_value=[]), \
+             patch("modules.screen_tools._get_highlighted_text_silent", return_value="This is a long highlighted paragraph from a web article."), \
+             patch("modules.screen_tools._summarize_text_with_llm", return_value="Mock highlight summary") as mock_llm:
+            res = smart_context_action("explain")
+            assert res == "Mock highlight summary"
+            assert mock_llm.call_args.kwargs["mode"] == "explain"
+
+    def test_screen_ocr_fallback(self):
+        from PIL import Image
+        from modules.screen_tools import smart_context_action
+
+        fake_img = Image.new("RGB", (100, 100), (10, 20, 30))
+        fake_elements = [{"text": "Breaking news article headline on screen", "center": (50, 50), "bbox": (10, 10, 80, 20), "confidence": 0.99}]
+
+        with patch("modules.screen_tools._get_explorer_selected_files", return_value=[]), \
+             patch("modules.screen_tools._get_highlighted_text_silent", return_value=""), \
+             patch("modules.screen_tools._capture_screenshot", return_value=(fake_img, 0, 0)), \
+             patch("modules.screen_tools._extract_ocr_elements", return_value=fake_elements), \
+             patch("modules.screen_tools.get_active_window", return_value="Chrome"), \
+             patch("modules.screen_tools._summarize_text_with_llm", return_value="Mock OCR article summary") as mock_llm:
+            res = smart_context_action("summarize")
+            assert res == "Mock OCR article summary"
+            assert "Breaking news article" in mock_llm.call_args.args[0]

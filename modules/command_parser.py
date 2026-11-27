@@ -312,6 +312,16 @@ class CommandParser:
             "screen padho": ("read_screen_text", {}),
             "list controls": ("list_window_controls", {}),
             "window controls": ("list_window_controls", {}),
+            "summarize this": ("smart_context_action", {"mode": "summarize"}),
+            "summarize it": ("smart_context_action", {"mode": "summarize"}),
+            "isko summarize karo": ("smart_context_action", {"mode": "summarize"}),
+            "is file ko summarize karo": ("smart_context_action", {"mode": "summarize"}),
+            "summarize article": ("smart_context_action", {"mode": "summarize"}),
+            "summarize page": ("smart_context_action", {"mode": "summarize"}),
+            "explain this": ("smart_context_action", {"mode": "explain"}),
+            "explain it": ("smart_context_action", {"mode": "explain"}),
+            "isko explain karo": ("smart_context_action", {"mode": "explain"}),
+            "isko samjhao": ("smart_context_action", {"mode": "explain"}),
 
             # Phase 5 Files
             "undo file": ("undo_file_action", {}),

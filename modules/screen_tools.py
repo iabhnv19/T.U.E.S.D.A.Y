@@ -662,3 +662,233 @@ def type_into_field(text: str, field_name: Optional[str] = None) -> str:
         return f"Text '{text}' type kar diya."
     except Exception as e:
         return f"Type karne mein error aaya: {e}"
+
+
+# ── Zero-Friction Smart Context Action ("Summarize / Explain This") ───────
+
+def _get_explorer_selected_files() -> List[str]:
+    """Detect file paths currently selected in Windows File Explorer or on the Desktop."""
+    if not HAS_WIN32:
+        return []
+    try:
+        hwnd = win32gui.GetForegroundWindow()
+        if not hwnd:
+            return []
+        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+        proc_name = psutil.Process(pid).name().lower() if pid > 0 else ""
+        if proc_name != "explorer.exe":
+            return []
+
+        selected_paths: List[str] = []
+        # 1. Try Shell.Application COM (zero clipboard side-effects)
+        try:
+            import pythoncom
+            import win32com.client
+
+            pythoncom.CoInitialize()
+            try:
+                shell = win32com.client.Dispatch("Shell.Application")
+                for window in shell.Windows():
+                    try:
+                        if int(window.HWND) == int(hwnd):
+                            items = window.Document.SelectedItems()
+                            for item in items:
+                                p = getattr(item, "Path", "")
+                                if p and os.path.exists(p):
+                                    selected_paths.append(p)
+                            break
+                    except Exception:
+                        continue
+            finally:
+                pythoncom.CoUninitialize()
+        except Exception:
+            pass
+
+        if selected_paths:
+            return selected_paths
+
+        # 2. Fallback for Desktop icons (Progman/WorkerW) using CF_HDROP with clipboard preservation
+        import win32clipboard
+
+        old_clip = ""
+        try:
+            old_clip = pyperclip.paste()
+        except Exception:
+            pass
+
+        try:
+            pyperclip.copy("")
+            time.sleep(0.04)
+            pyautogui.hotkey("ctrl", "c")
+            time.sleep(0.14)
+            win32clipboard.OpenClipboard()
+            try:
+                if win32clipboard.IsClipboardFormatAvailable(win32clipboard.CF_HDROP):
+                    files = win32clipboard.GetClipboardData(win32clipboard.CF_HDROP)
+                    selected_paths = [f for f in files if f and os.path.exists(f)]
+            finally:
+                win32clipboard.CloseClipboard()
+        except Exception:
+            pass
+        finally:
+            if old_clip:
+                try:
+                    pyperclip.copy(old_clip)
+                except Exception:
+                    pass
+
+        return selected_paths
+    except Exception:
+        return []
+
+
+def _get_highlighted_text_silent() -> str:
+    """Safely read highlighted text from any app while preserving user's clipboard."""
+    old_clipboard = ""
+    try:
+        old_clipboard = pyperclip.paste()
+    except Exception:
+        pass
+
+    try:
+        pyperclip.copy("")
+        time.sleep(0.04)
+        pyautogui.hotkey("ctrl", "c")
+        time.sleep(0.14)
+        selected = pyperclip.paste()
+        return (selected or "").strip()
+    except Exception:
+        return ""
+    finally:
+        if old_clipboard:
+            try:
+                pyperclip.copy(old_clipboard)
+            except Exception:
+                pass
+
+
+def _summarize_text_with_llm(text: str, source_label: str, mode: str = "summarize") -> str:
+    """Summarize or explain extracted text in concise spoken Hinglish."""
+    from core.config import Config
+    from core.llm import UniversalLLMClient
+
+    is_local = Config.LLM_PROVIDER in ("ollama", "lmstudio")
+    if not Config.LLM_API_KEY and not is_local:
+        return "AI API key missing hai Sir, content summarize nahi kar sakti."
+
+    task_instruction = (
+        "Explain clearly in simple, conversational Hinglish (2 to 3 crisp sentences)"
+        if mode == "explain"
+        else "Summarize the key points clearly in conversational Hinglish (2 to 3 crisp sentences)"
+    )
+
+    try:
+        client = UniversalLLMClient(
+            provider=Config.LLM_PROVIDER,
+            api_key=Config.LLM_API_KEY,
+            base_url=Config.LLM_BASE_URL,
+            default_model=Config.LLM_MODEL,
+        )
+        resp = client.chat.completions.create(
+            model=client.default_model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        f"You are {Config.NAME}, a sharp, warm Hinglish desktop assistant. "
+                        f"Address the user respectfully as Sir or Boss. {task_instruction}. "
+                        "STRICT RULES: No emojis, no markdown asterisks, no bullet points, no raw URLs. "
+                        "Output clean spoken dialogue only."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Source: {source_label}\n\nContent:\n{text[:6000]}",
+                },
+            ],
+            max_tokens=280,
+            temperature=0.3,
+        )
+        if resp and resp.choices:
+            return (resp.choices[0].message.content or "").strip()
+    except Exception as e:
+        return f"Content {mode} karne mein error aaya Sir: {e}"
+    return "Content samajh nahi aaya Sir, ek baar fir try karein?"
+
+
+@tool(
+    name="smart_context_action",
+    description=(
+        "Automatically detect what the user is looking at or has selected—a selected file in Explorer/Desktop, "
+        "highlighted text in any app, or the active web article/screen via OCR—and summarize or explain it."
+    ),
+    params_schema={
+        "mode": {
+            "type": "string",
+            "description": "Action mode: 'summarize' or 'explain'. Defaults to 'summarize'.",
+        }
+    },
+    risk="low",
+)
+def smart_context_action(mode: str = "summarize") -> str:
+    """Zero-friction context-aware summarize/explain for selected files, highlighted text, or active screen."""
+    mode = "explain" if str(mode).lower().strip() == "explain" else "summarize"
+
+    # Priority 1: Selected file in Windows Explorer / Desktop
+    selected_files = _get_explorer_selected_files()
+    if selected_files:
+        target = selected_files[0]
+        filename = os.path.basename(target)
+        ext = os.path.splitext(target)[1].lower()
+
+        if os.path.isdir(target):
+            try:
+                entries = os.listdir(target)[:25]
+                listing = ", ".join(entries) if entries else "empty folder"
+                return _summarize_text_with_llm(
+                    f"Folder '{filename}' contains {len(entries)} items: {listing}",
+                    source_label=f"Selected folder {filename}",
+                    mode=mode,
+                )
+            except Exception as e:
+                return f"Folder '{filename}' read nahi ho paya Sir: {e}"
+
+        image_exts = {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tiff"}
+        if ext in image_exts:
+            try:
+                from PIL import Image
+                img = Image.open(target)
+                elements = _extract_ocr_elements(img)
+                ocr_text = " ".join(el["text"] for el in elements).strip()
+                if not ocr_text:
+                    return f"Sir, '{filename}' image mein koi readable text nahi mila."
+                return _summarize_text_with_llm(ocr_text, source_label=f"Image {filename} (OCR)", mode=mode)
+            except Exception as e:
+                return f"Image '{filename}' scan karne mein error aaya: {e}"
+
+        try:
+            from modules.file_tools import read_file_content
+            content = read_file_content(target, max_chars=6000)
+            if content.startswith("File nahi mili") or content.startswith("Error"):
+                return content
+            return _summarize_text_with_llm(content, source_label=f"Selected file {filename}", mode=mode)
+        except Exception as e:
+            return f"File '{filename}' read karne mein error aaya: {e}"
+
+    # Priority 2: Highlighted text in any active app (Browser, Editor, PDF)
+    highlighted = _get_highlighted_text_silent()
+    if len(highlighted) >= 20:
+        return _summarize_text_with_llm(highlighted, source_label="Highlighted text", mode=mode)
+
+    # Priority 3: Active Web Article / Screen via Living Cyber Scan OCR
+    img, _, _ = _capture_screenshot()
+    if img is None:
+        return "Screen capture nahi ho paya Sir."
+
+    elements = _extract_ocr_elements(img)
+    if not elements:
+        return "Screen par koi readable text nahi mila Sir."
+
+    screen_text = " ".join(el["text"] for el in elements)
+    active_title = get_active_window()
+    return _summarize_text_with_llm(screen_text, source_label=f"Active screen ({active_title})", mode=mode)
